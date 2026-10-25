@@ -14,13 +14,22 @@ export function SpeculosScreen({ url }: { url: string }) {
   const pressed = useRef<{ x: number; y: number } | undefined>(undefined);
 
   useEffect(() => {
-    const refresh = () => setSrc(`${base}/screenshot?t=${Date.now()}`);
+    const shot = () => setSrc(`${base}/screenshot?t=${Date.now()}`);
+    // 事件推送可能早于屏幕渲染完成：收到事件后过一会儿再各截一次，否则会停在上一页
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const refresh = () => {
+      shot();
+      timers.push(setTimeout(shot, 300), setTimeout(shot, 1000));
+    };
     refresh();
     const events = new EventSource(`${base}/events?stream=true`);
     events.onmessage = refresh;
     events.onopen = refresh;
     events.onerror = () => setTimeout(refresh, 2000);
-    return () => events.close();
+    return () => {
+      events.close();
+      timers.forEach(clearTimeout);
+    };
   }, [base]);
 
   // 截图加载失败后每 2 秒重试（一次失败可能只是瞬时的）

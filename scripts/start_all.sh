@@ -5,6 +5,33 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd -P)"
 cd "$root"
 mkdir -p data/logs data/pids
+source scripts/ports.sh
+
+# 预检：端口被占用时报错退出，不静默启动第二个实例。
+# 由本脚本上次启动、仍在运行的服务（pid 文件里的进程或它的子进程）不算冲突，后面会直接跳过。
+owned() {  # owned <名字> <端口>：端口上的每个监听进程都属于 data/pids/<名字>
+  local pidfile="data/pids/$1" pid
+  [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null || return 1
+  for pid in $(listeners "$2"); do descends_from "$pid" "$(cat "$pidfile")" || return 1; done
+}
+conflicts=""
+for spec in merchant:$PORT_MERCHANT api:$PORT_API console:$PORT_CONSOLE; do
+  name="${spec%%:*}"; port="${spec##*:}"
+  [ -z "$(listeners "$port")" ] && continue
+  owned "$name" "$port" && continue
+  for pid in $(listeners "$port"); do conflicts="$conflicts\n  端口 $port（$name）已被占用：$(describe "$pid")"; done
+done
+if [ -n "$(listeners "$PORT_SPECULOS")" ] && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx speculos-xrp; then
+  for pid in $(listeners "$PORT_SPECULOS"); do conflicts="$conflicts\n  端口 $PORT_SPECULOS（speculos）已被占用：$(describe "$pid")"; done
+fi
+for pid in $(sentinel_pids); do
+  [ -f data/pids/sentinel ] && [ "$(cat data/pids/sentinel)" = "$pid" ] && continue
+  conflicts="$conflicts\n  已有哨兵在运行（不在 pid 文件里）：$(describe "$pid")"
+done
+if [ -n "$conflicts" ]; then
+  printf "✗ 发现已在运行的残留实例，没有启动任何服务：%b\n先运行 scripts/stop_all.sh 清理，再重新启动。\n" "$conflicts" >&2
+  exit 1
+fi
 
 wait_http() {  # wait_http <名字> <url>
   for _ in $(seq 60); do curl -sf -o /dev/null "$2" && { echo "  ✓ $1  $2"; return 0; }; sleep 1; done
