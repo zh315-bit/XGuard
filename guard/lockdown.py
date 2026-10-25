@@ -13,15 +13,12 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from xrpl.core.binarycodec import encode
 from xrpl.models.requests import AccountInfo, ServerState
 from xrpl.models.transactions import Payment
-from xrpl.transaction import sign
 
 from guard import chain
 from guard.db import connect, immediate
 from guard.policy import DENY, Decision, fmt_xrp
-from guard.x402_payment import decision_memo
 from guard.xrpl_client import address_of, explorer_tx_url, get_client, load_wallet
 
 RULE_ID = "LOCKDOWN"
@@ -50,7 +47,7 @@ def ensure_unlocked() -> None:
 def status() -> dict[str, Any]:
     with connect() as conn:
         row = conn.execute("SELECT * FROM lockdown WHERE id = 1").fetchone()
-        sweep = conn.execute("SELECT * FROM contained_txs ORDER BY created_at DESC LIMIT 1").fetchone()
+        sweep = conn.execute("SELECT * FROM contained_txs WHERE kind = 'contain' ORDER BY created_at DESC LIMIT 1").fetchone()
     state = dict(row) if row else {"locked": 0, "locked_at": None, "reason": None, "released_at": None, "release_note": None}
     state["locked"] = bool(state["locked"])
     last = dict(sweep) if sweep else None
@@ -107,26 +104,9 @@ def contain(note: str = "Contain from the console") -> dict[str, Any]:
         return {**status(), "swept": None}
     memo = {"action": "contain", "reason": REASON, "balance_before_xrp": fmt_xrp(balance),
             "reserve_xrp": fmt_xrp(reserve), "returned_xrp": fmt_xrp(amount)}
-    tx = Payment(account=agent.address, destination=address_of("treasury"), amount=str(amount), fee=tx.fee,
-                 sequence=tx.sequence, last_ledger_sequence=tx.last_ledger_sequence,
-                 memos=[decision_memo(memo, memo_type="agentguard/contain")])
-    signed = sign(tx, agent)
-    tx_hash = signed.get_hash()
-    now = time.time()
-    # 先登记再提交：哨兵看到这笔交易时守卫一定已有授权记录
-    with immediate() as conn:
-        conn.execute("INSERT INTO contained_txs (tx_hash, created_at, amount_drops, detail) VALUES (?, ?, ?, ?)",
-                     (tx_hash, now, amount, json.dumps(memo)))
-        _event(conn, now, "contain_sweep", tx_hash, memo)
-    try:
-        result = chain.submit_signed(encode(signed.to_xrpl()))
-        code = chain.result_code(result)
-    except chain.SubmitUnknown as exc:
-        code = f"unknown: {exc}"
-    with immediate() as conn:
-        conn.execute("UPDATE contained_txs SET result = ? WHERE tx_hash = ?", (code, tx_hash))
-    return {**status(), "swept": {"tx_hash": tx_hash, "amount_xrp": fmt_xrp(amount), "result": code,
-                                  "explorer_url": explorer_tx_url(tx_hash)}}
+    from guard.hot_wallet import sweep_to_treasury   # 避免循环导入
+    swept = sweep_to_treasury(amount, memo, kind="contain", memo_type="agentguard/contain", prepared=tx)
+    return {**status(), "swept": swept}
 
 
 def contained_tx(tx_hash: str) -> Optional[dict]:

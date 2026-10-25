@@ -421,14 +421,24 @@ def set_merchant_e_mode(body: ModeBody) -> dict[str, Any]:
 
 @app.post("/api/demo/reset")
 def demo_reset() -> dict[str, Any]:
-    """清空本地审计、预算、审批、支付请求（R6 频率也由它们统计），并重置商户 D 的调包计数。
-    链上交易不会也不需要撤销。只在 DEMO_MODE=true 时可用。"""
+    """一键恢复演示环境（只在 DEMO_MODE=true 时可用）：
+    1. 解除锁定（记入审计），把所有未处理的警报标为已处理
+    2. 清空本地审计、预算、审批、支付请求（R6 频率也由它们统计），重置商户 D 的调包计数
+    3. 热钱包恢复到上限：低于上限向 testnet 水龙头申请，超出部分由热钱包签名转回金库（登记为已授权）
+    全程不用金库签名、不需要 Ledger。水龙头失败时其余步骤照常完成，结果里 hot_wallet.ok = false。
+    链上交易不会也不需要撤销。"""
     if env("DEMO_MODE", "false").lower() != "true":
         raise HTTPException(403, "Demo reset is only available when DEMO_MODE=true in .env")
     if mission_runner.running_mission():
         raise HTTPException(409, "A mission is running: cancel it or wait for it to finish before resetting")
     tables = ("escrows", "signing_requests", "budget_reservations", "approvals", "payment_requests", "decisions",
               "mission_events", "missions")
+    unlocked = False
+    if lockdown.is_locked():
+        lockdown.release("Released by demo reset")
+        unlocked = True
+    acked = [a["hash"] for a in monitor.view()["open_alerts"]
+             if monitor.acknowledge(a["hash"], "Marked as handled by demo reset")]
     with connect() as conn:
         cleared = {t: conn.execute(f"DELETE FROM {t}").rowcount for t in tables}
     credentials.clear_cache()
@@ -438,4 +448,9 @@ def demo_reset() -> dict[str, Any]:
         merchant_reset = True
     except requests.RequestException:
         merchant_reset = False
-    return {"cleared": cleared, "merchant_d_reset": merchant_reset}
+    try:
+        refill = hot_wallet.refill_for_demo()
+    except Exception as exc:  # noqa: BLE001 —— 补款失败不影响已经完成的重置
+        refill = {"ok": False, "error": f"Hot wallet refill failed, please top up manually ({exc})"}
+    return {"cleared": cleared, "merchant_d_reset": merchant_reset, "lockdown_released": unlocked,
+            "alerts_acknowledged": acked, "hot_wallet": refill}

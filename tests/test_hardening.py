@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from guard import api, payments, policy
+from guard import api, hot_wallet, payments, policy
 from guard import state_machine as sm
 from guard.db import connect
 from fakes import OTHER, PAYEE, fetch, merchant, offline, terms, write_policy  # noqa: F401
@@ -79,6 +79,7 @@ def test_demo_reset_requires_demo_mode(monkeypatch):
 def test_demo_reset_clears_local_state(merchant, offline, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "true")
     monkeypatch.setenv("MERCHANT_BASE_URL", merchant.base)   # 假商户没有 /data/d/reset，返回 merchant_d_reset=False
+    monkeypatch.setattr(hot_wallet, "refill_for_demo", lambda: {"ok": True, "balance_xrp": "20"})   # 不碰链（见 test_demo_reset.py）
     fetch(merchant)
     merchant.default_terms = terms(8_000_000)
     fetch(merchant)

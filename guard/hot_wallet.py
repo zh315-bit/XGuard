@@ -3,6 +3,9 @@
 - cap_excess()：超过上限的部分转回金库（热钱包自己签名，带审计 Memo）
 - request_topup()：补款只能由金库付款 → 生成一张审批单，必须人工批准 + 设备签名
 - execute_topup()：批准后执行；付款前用最新余额再查一次，补完不得超过上限
+- sweep_to_treasury()：热钱包自己签名转回金库，提交前登记哈希（Contain / demo 重置共用）
+- refill_for_demo()：demo 重置用。余额低于上限时向 testnet 水龙头申请，再把超过上限的部分转回金库。
+  全程只用热钱包签名，绝不动用金库
 """
 
 import json
@@ -10,17 +13,25 @@ import time
 import uuid
 from typing import Any, Optional
 
+import requests
+from xrpl.core.binarycodec import encode
+from xrpl.transaction import sign
+
 from x402_xrpl.types import PaymentRequirements
 from xrpl.models.transactions import Payment, Transaction
 
-from guard import approvals, audit, chain, payments, policy, risk_explainer
+from guard import approvals, audit, chain, lockdown, payments, policy, risk_explainer
 from guard import state_machine as sm
 from guard.policy import HOLD, Decision, fmt_xrp
 from guard.quote import Quote
 from guard.signers import Signer, verify_signed_blob
 from guard.x402_payment import decision_memo
+from guard.config import env
+from guard.db import immediate
 from guard.xrpl_client import address_of, explorer_tx_url, load_wallet
 
+FAUCET_URL = "https://faucet.altnet.rippletest.net/accounts"
+FAUCET_WAIT_SECONDS = 40     # 水龙头返回后，等到账的最长时间
 TOPUP_SCHEME = "topup"
 TOPUP_URL = "xrpl://treasury/topup-hot-wallet"
 OPERATOR = "operator"
@@ -63,7 +74,6 @@ def cap_excess() -> Optional[dict[str, Any]]:
 
 def request_topup(amount_drops: int, reason: str) -> dict[str, Any]:
     """创建补款审批单。补完会超过上限的请求直接拒绝，不会生成审批单。"""
-    from guard import lockdown
     lockdown.ensure_unlocked()
     cfg = policy.load_policy()
     if amount_drops <= 0:
@@ -130,3 +140,73 @@ def _check_cap(balance_drops: int, amount_drops: int, cfg: policy.PolicyConfig) 
         raise CapExceeded(f"After the top-up the hot wallet would hold {fmt_xrp(balance_drops + amount_drops)} XRP, above the cap of "
                           f"{fmt_xrp(cfg.hot_wallet_max_balance_drops)} XRP (balance {fmt_xrp(balance_drops)})")
 
+
+
+def sweep_to_treasury(amount_drops: int, memo: dict[str, Any], *, kind: str, memo_type: str,
+                      prepared: Optional[Transaction] = None) -> dict[str, Any]:
+    """热钱包签名转 amount_drops 回金库。签名后、提交前把哈希登记到 contained_txs，哨兵据此对账为 matched。"""
+    agent = load_wallet("agent")
+    prepared = prepared or chain.prepare(Payment(account=agent.address, destination=address_of("treasury"), amount="1"))
+    tx = Payment(account=agent.address, destination=address_of("treasury"), amount=str(amount_drops), fee=prepared.fee,
+                 sequence=prepared.sequence, last_ledger_sequence=prepared.last_ledger_sequence,
+                 memos=[decision_memo(memo, memo_type=memo_type)])
+    signed = sign(tx, agent)
+    tx_hash = signed.get_hash()
+    now = time.time()
+    with immediate() as conn:
+        conn.execute("INSERT INTO contained_txs (tx_hash, kind, created_at, amount_drops, detail) VALUES (?, ?, ?, ?, ?)",
+                     (tx_hash, kind, now, amount_drops, json.dumps(memo)))
+        lockdown._event(conn, now, f"{kind.replace('-', '_')}_sweep", tx_hash, memo)
+    try:
+        code = chain.result_code(chain.submit_signed(encode(signed.to_xrpl())))
+    except chain.SubmitUnknown as exc:
+        code = f"unknown: {exc}"
+    with immediate() as conn:
+        conn.execute("UPDATE contained_txs SET result = ? WHERE tx_hash = ?", (code, tx_hash))
+    return {"tx_hash": tx_hash, "amount_xrp": fmt_xrp(amount_drops), "result": code, "explorer_url": explorer_tx_url(tx_hash)}
+
+
+def faucet_fund(address: str) -> int:
+    """向 testnet 水龙头申请资金，等到账后返回新余额（drops）。失败抛 RuntimeError。"""
+    before = chain.balance_drops(address)
+    try:
+        resp = requests.post(env("XRPL_FAUCET_URL", FAUCET_URL), json={"destination": address}, timeout=30)
+    except requests.RequestException as exc:
+        raise RuntimeError(f"faucet request failed: {exc}") from exc
+    if resp.status_code >= 300:
+        raise RuntimeError(f"faucet returned HTTP {resp.status_code}: {resp.text[:200]}")
+    deadline = time.time() + FAUCET_WAIT_SECONDS
+    while time.time() < deadline:
+        balance = chain.balance_drops(address)
+        if balance > before:
+            return balance
+        time.sleep(2)
+    raise RuntimeError(f"faucet funds did not arrive within {FAUCET_WAIT_SECONDS} s")
+
+
+def refill_for_demo() -> dict[str, Any]:
+    """把热钱包恢复到上限：低于上限 → 水龙头；超过上限的部分 → 热钱包签名转回金库。不用金库签任何交易。"""
+    cfg = policy.load_policy()
+    cap = cfg.hot_wallet_max_balance_drops
+    address = address_of("agent")
+    out: dict[str, Any] = {"ok": True, "faucet": None, "sweep": None, "error": None}
+    balance = chain.balance_drops(address)
+    out["balance_before_xrp"] = fmt_xrp(balance)
+    if balance < cap:
+        try:
+            balance = faucet_fund(address)
+            out["faucet"] = {"balance_after_xrp": fmt_xrp(balance)}
+        except Exception as exc:  # noqa: BLE001 —— 水龙头失败不影响重置的其余步骤
+            out.update(ok=False, error=f"Hot wallet refill failed, please top up manually ({exc})")
+            out["balance_xrp"] = fmt_xrp(balance)
+            return out
+    prepared = chain.prepare(Payment(account=address, destination=address_of("treasury"), amount="1"))
+    excess = balance - cap - int(prepared.fee)       # 手续费另付，转完正好等于上限
+    if excess > 0:
+        memo = {"action": "demo-refill", "cap_xrp": fmt_xrp(cap), "balance_before_xrp": fmt_xrp(balance),
+                "returned_xrp": fmt_xrp(excess)}
+        out["sweep"] = sweep_to_treasury(excess, memo, kind="demo-refill", memo_type="agentguard/hot-wallet", prepared=prepared)
+        if out["sweep"]["result"] != "tesSUCCESS":
+            out.update(ok=False, error=f"Returning the excess to the treasury failed ({out['sweep']['result']})")
+    out["balance_xrp"] = fmt_xrp(chain.balance_drops(address))
+    return out

@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS monitor_txs (   -- 独立哨兵（watchdog/sentinel.p
     watched     TEXT,                   -- 涉及的受监控账户：treasury / hot_wallet（逗号分隔）
     direction   TEXT NOT NULL,          -- outgoing（受监控账户发起）/ incoming
     status      TEXT NOT NULL,          -- pending（宽限期内）/ matched / UNAUTHORIZED / incoming
-    match_kind  TEXT,                   -- contain / x402 / topup / escrow-lock / escrow-release / escrow-refund / hot-wallet-cap / audit
+    match_kind  TEXT,                   -- contain / demo-refill / x402 / topup / escrow-lock / escrow-release / escrow-refund / hot-wallet-cap / audit
     match_ref   TEXT,
     flagged_at  REAL,
     acknowledged_at REAL,
@@ -204,8 +204,9 @@ CREATE TABLE IF NOT EXISTS lockdown (      -- 安全锁定（单行 id = 1），
     released_at REAL,
     release_note TEXT
 );
-CREATE TABLE IF NOT EXISTS contained_txs ( -- Contain 时热钱包转回金库的交易（提交前登记，哨兵据此对账）
+CREATE TABLE IF NOT EXISTS contained_txs ( -- 守卫发起的热钱包 → 金库转账（提交前登记，哨兵据此对账）
     tx_hash     TEXT PRIMARY KEY,
+    kind        TEXT NOT NULL DEFAULT 'contain',   -- contain（安全处置）/ demo-refill（demo 重置时回收多余余额）
     created_at  REAL NOT NULL,
     amount_drops INTEGER NOT NULL,
     result      TEXT,
@@ -218,6 +219,7 @@ _ADDED_COLUMNS = {
     "decisions": ["risk_json TEXT"],
     "payment_requests": ["method TEXT NOT NULL DEFAULT 'x402'"],
     "missions": ["source TEXT NOT NULL DEFAULT 'cli'", "pid INTEGER"],
+    "contained_txs": ["kind TEXT NOT NULL DEFAULT 'contain'"],
     "approvals": ["decided_at TEXT", "tx_hash TEXT", "result_json TEXT", "reject_reason TEXT", "last_error TEXT",
                   "quote_hash TEXT", "expires_at REAL", "payment_request_id INTEGER", "risk_json TEXT",
                   "snapshot_json TEXT"],   # 审批人看到并批准的完整报价快照（含验收条件），验货只用它,

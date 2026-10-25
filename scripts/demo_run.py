@@ -51,11 +51,17 @@ def pause_for_signature(approval_id: str, key: str) -> None:
 
 def setup(e_mode: str) -> None:
     try:
-        requests.post(f"{API}/api/demo/reset", timeout=10).raise_for_status()
+        reset = requests.post(f"{API}/api/demo/reset", timeout=120)
+        reset.raise_for_status()
         requests.post(f"{MERCHANT}/data/e/mode", json={"mode": e_mode}, timeout=5).raise_for_status()
     except requests.RequestException as exc:
         sys.exit(f"服务没起来或 DEMO_MODE 不是 true：{exc}\n先运行 scripts/start_all.sh")
     print(f"{BOLD}AgentGuard demo{RESET}  已清空本地状态，商户 E 设为 {e_mode} 模式。控制台：{CONSOLE}")
+    hot = reset.json().get("hot_wallet") or {}
+    if hot.get("ok"):
+        print(f"{DIM}热钱包余额 {hot.get('balance_xrp')} XRP{RESET}")
+    else:
+        print(f"\033[41m\033[97m 热钱包补款失败，请手动补款 {RESET} {hot.get('error')}")
 
 
 def run_agent() -> int:

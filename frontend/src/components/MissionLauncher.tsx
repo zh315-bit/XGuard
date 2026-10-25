@@ -4,6 +4,11 @@ import { postJson, usePoll, type Mission } from "../api";
 const MAX_CHARS = 2000;
 
 type Preset = { id: string; label: string; task: string };
+type ResetResult = {
+  lockdown_released: boolean;
+  alerts_acknowledged: string[];
+  hot_wallet: { ok: boolean; balance_xrp?: string; error?: string | null };
+};
 type Mode = "normal" | "garbage";
 
 /** 在网页上发起 agent 任务。任务文本只是 agent 的输入：无论写什么，守卫的判定都不受影响。 */
@@ -43,8 +48,17 @@ export function MissionLauncher({ mission, onChange }: { mission?: Mission | nul
     return `Mission #${mission!.id} cancelled`;
   });
   const reset = () => act(async () => {
-    await postJson("/api/demo/reset");
-    return "Cleared local audit, budget, approval and mission records (on-chain transactions are unaffected)";
+    const r = await postJson<ResetResult>("/api/demo/reset");
+    const done = [
+      r.lockdown_released && "lockdown released",
+      r.alerts_acknowledged.length > 0 && `${r.alerts_acknowledged.length} alert(s) marked as handled`,
+      "local records cleared",
+    ].filter(Boolean).join(", ");
+    if (!r.hot_wallet.ok) {
+      // 水龙头失败：其余步骤已完成，但必须明确提示人工补款
+      throw new Error(`Reset done (${done}), but the hot wallet refill failed, please top up manually: ${r.hot_wallet.error}`);
+    }
+    return `Reset done: ${done}; hot wallet at ${r.hot_wallet.balance_xrp} XRP`;
   });
   const setMode = (mode: Mode) => act(async () => {
     await postJson("/api/demo/merchant-e-mode", { mode });
@@ -101,7 +115,8 @@ export function MissionLauncher({ mission, onChange }: { mission?: Mission | nul
             </button>
           ))}
         </div>
-        {msg && <span className={`text-xs ${msg.bad ? "text-rose-300" : "text-sky-300"}`}>{msg.text}</span>}
+        {msg && <span role={msg.bad ? "alert" : undefined}
+                      className={`text-xs ${msg.bad ? "rounded-md bg-rose-500/15 px-2 py-1 font-medium text-rose-300" : "text-sky-300"}`}>{msg.text}</span>}
       </div>
     </section>
   );
