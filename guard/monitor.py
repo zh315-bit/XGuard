@@ -40,6 +40,9 @@ def match(tx: dict[str, Any], watched: dict[str, str]) -> Optional[tuple[str, st
     """outgoing 交易在守卫数据库里的授权记录：(match_kind, match_ref)，没有返回 None。"""
     tx_hash = tx["hash"]
     with connect() as conn:
+        row = conn.execute("SELECT tx_hash FROM contained_txs WHERE tx_hash = ?", (tx_hash,)).fetchone()
+        if row:
+            return "contain", "lockdown sweep to treasury"
         row = conn.execute("SELECT id, method FROM payment_requests WHERE tx_hash = ?", (tx_hash,)).fetchone()
         if row:
             return _PAYMENT_KIND.get(row["method"], row["method"]), f"payment #{row['id']}"

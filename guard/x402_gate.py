@@ -13,7 +13,7 @@ from typing import Any, Optional
 import requests
 from x402_xrpl.types import PaymentRequirements
 
-from guard import approvals, audit, budget, evaluation, maintenance, payment_executor, payments, policy, risk_explainer
+from guard import approvals, audit, budget, evaluation, lockdown, maintenance, payment_executor, payments, policy, risk_explainer
 from guard import state_machine as sm
 from guard.budget import BudgetExceeded
 from guard.policy import AUTO, DENY, HOLD, DROPS_PER_XRP, Decision, fmt_xrp
@@ -59,6 +59,9 @@ def fetch_paid(url: str, purpose: str, max_price_xrp: Optional[Decimal] = None, 
     if not created:
         return _replay(row, url)
     pid = row["id"]
+
+    if lockdown.is_locked():
+        return _deny(pid, url, purpose, None, lockdown.decision(), from_state=sm.RECEIVED)
 
     # 不跟随重定向：3xx 按错误处理，避免被带到别的地方去拿报价或内容
     try:

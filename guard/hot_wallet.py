@@ -63,6 +63,8 @@ def cap_excess() -> Optional[dict[str, Any]]:
 
 def request_topup(amount_drops: int, reason: str) -> dict[str, Any]:
     """创建补款审批单。补完会超过上限的请求直接拒绝，不会生成审批单。"""
+    from guard import lockdown
+    lockdown.ensure_unlocked()
     cfg = policy.load_policy()
     if amount_drops <= 0:
         raise CapExceeded("The top-up amount must be greater than 0")

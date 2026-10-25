@@ -3,13 +3,15 @@
 import time
 from typing import Optional
 
-from guard import budget, credentials, payments, policy
+from guard import budget, credentials, lockdown, payments, policy
 from guard.policy import Decision, EvalContext
 from guard.quote import Quote
 
 
 def decide(quote: Quote, cfg: Optional[policy.PolicyConfig] = None) -> Decision:
     """每次重新读 policy.yaml，现场改阈值立即生效。"""
+    if lockdown.is_locked():
+        return lockdown.decision()
     cfg = cfg or policy.load_policy()
     ctx = EvalContext(
         auto_committed_today_drops=budget.committed_today(budget.AUTO_KIND),

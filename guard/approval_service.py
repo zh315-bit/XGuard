@@ -13,7 +13,7 @@ import json
 import time
 from typing import Any
 
-from guard import approvals, audit, budget, maintenance, payment_executor, payments, policy, signing_requests
+from guard import approvals, audit, budget, lockdown, maintenance, payment_executor, payments, policy, signing_requests
 from guard import state_machine as sm
 from guard.budget import BudgetExceeded
 from guard.signers import ExternalSigner, Signer, approval_signer
@@ -44,6 +44,8 @@ async def approve(approval_id: int, signer: Signer | None = None,
     R3 审批单必须带 confirm_payee_suffix（收款地址后 4 位，区分大小写），否则拒绝执行批准。"""
     maintenance.sweep()
     approval = _require_pending(approval_id)
+    if lockdown.is_locked():
+        raise ApprovalError(423, f"Cannot approve: {lockdown.REASON}")
     if payee_confirmation_required(approval):
         pay_to = json.loads(approval["quote_json"])["payTo"]
         if (confirm_payee_suffix or "").strip() != pay_to[-4:]:
@@ -90,6 +92,8 @@ def submit_signature(approval_id: int, signed_blob: str) -> dict[str, Any]:
     approval = approvals.get(approval_id)
     if approval is None:
         raise ApprovalError(404, f"Approval #{approval_id} does not exist")
+    if lockdown.is_locked():
+        raise ApprovalError(423, f"Signature not accepted: {lockdown.REASON}")
     try:
         signing_requests.submit(approval, signed_blob)
     except signing_requests.SignatureRejected as exc:

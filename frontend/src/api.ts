@@ -263,6 +263,15 @@ export type MonitorTx = {
   explorer_url: string;
 };
 
+export type Lockdown = {
+  locked: boolean;
+  locked_at?: number | null;
+  reason?: string | null;
+  released_at?: number | null;
+  release_note?: string | null;
+  containment?: { tx_hash: string; amount_xrp: string; result?: string | null; explorer_url: string; created_at: number } | null;
+};
+
 export type Monitor = {
   health: {
     status: "connected" | "connecting" | "reconnecting" | "disconnected" | "stale" | "stopped" | "offline";

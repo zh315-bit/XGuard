@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from guard import (approval_service, approvals, audit, budget, credentials, escrow, hot_wallet, llm, maintenance,
-                   mission_runner, missions, monitor, payments, policy, policy_settings, report, treasury, views)
+                   lockdown, mission_runner, missions, monitor, payments, policy, policy_settings, report, treasury, views)
 from guard.approval_service import ApprovalError
 from guard.policy_settings import PolicyValidationError
 from guard.config import env
@@ -246,6 +246,38 @@ def ack_alert(tx_hash: str, body: Optional[AckBody] = None) -> dict[str, Any]:
     return row
 
 
+class ContainBody(BaseModel):
+    confirm: bool = Field(description="Must be true: second confirmation from a human in the console")
+
+
+class ReleaseBody(BaseModel):
+    note: str = Field(default="Lockdown released from the console", max_length=300)
+
+
+@app.get("/api/lockdown")
+def get_lockdown() -> dict[str, Any]:
+    return lockdown.status()
+
+
+@app.post("/api/lockdown/contain")
+def contain(body: ContainBody) -> dict[str, Any]:
+    """人工处置：先锁定，再把热钱包余额转回金库。只有控制台按钮（二次确认后）会调用，绝不自动执行。"""
+    if not body.confirm:
+        raise HTTPException(400, "Contain needs an explicit confirmation")
+    try:
+        return lockdown.contain()
+    except Exception as exc:  # noqa: BLE001 —— 锁定已生效；回收失败如实返回
+        raise HTTPException(502, f"Locked, but returning hot wallet funds failed: {exc}") from exc
+
+
+@app.post("/api/lockdown/release")
+def release_lockdown(body: Optional[ReleaseBody] = None) -> dict[str, Any]:
+    try:
+        return lockdown.release((body or ReleaseBody()).note)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
 class SettingsBody(BaseModel):
     changes: dict[str, str] = Field(description="Items to change; keys as in GET /api/settings, values are XRP amounts (strings)")
 
@@ -311,6 +343,8 @@ def request_topup(body: TopupBody) -> dict[str, Any]:
         return hot_wallet.request_topup(policy.xrp_to_drops(body.amount_xrp), body.reason)
     except hot_wallet.CapExceeded as exc:
         raise HTTPException(400, str(exc)) from exc
+    except lockdown.Locked as exc:
+        raise HTTPException(423, str(exc)) from exc
 
 
 @app.post("/api/missions")

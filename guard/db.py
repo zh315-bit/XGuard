@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS monitor_txs (   -- 独立哨兵（watchdog/sentinel.p
     watched     TEXT,                   -- 涉及的受监控账户：treasury / hot_wallet（逗号分隔）
     direction   TEXT NOT NULL,          -- outgoing（受监控账户发起）/ incoming
     status      TEXT NOT NULL,          -- pending（宽限期内）/ matched / UNAUTHORIZED / incoming
-    match_kind  TEXT,                   -- x402 / topup / escrow-lock / escrow-release / escrow-refund / hot-wallet-cap / audit
+    match_kind  TEXT,                   -- contain / x402 / topup / escrow-lock / escrow-release / escrow-refund / hot-wallet-cap / audit
     match_ref   TEXT,
     flagged_at  REAL,
     acknowledged_at REAL,
@@ -192,8 +192,23 @@ CREATE TABLE IF NOT EXISTS audit_events (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     ts          REAL NOT NULL,
     created_at  TEXT NOT NULL,
-    kind        TEXT NOT NULL,          -- unauthorized_tx / alert_acknowledged
+    kind        TEXT NOT NULL,          -- unauthorized_tx / alert_acknowledged / lockdown_engaged / lockdown_released / contain_sweep
     tx_hash     TEXT,
+    detail      TEXT
+);
+CREATE TABLE IF NOT EXISTS lockdown (      -- 安全锁定（单行 id = 1），重启后保持
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    locked      INTEGER NOT NULL,
+    locked_at   REAL,
+    reason      TEXT,
+    released_at REAL,
+    release_note TEXT
+);
+CREATE TABLE IF NOT EXISTS contained_txs ( -- Contain 时热钱包转回金库的交易（提交前登记，哨兵据此对账）
+    tx_hash     TEXT PRIMARY KEY,
+    created_at  REAL NOT NULL,
+    amount_drops INTEGER NOT NULL,
+    result      TEXT,
     detail      TEXT
 );
 """

@@ -1,6 +1,6 @@
 /** 独立哨兵（watchdog/sentinel.py）：所有页面顶部的 UNAUTHORIZED 警报 + Treasury 页的实时监控卡片。 */
 import { useState } from "react";
-import { postJson, usePoll, type Monitor, type MonitorTx } from "../api";
+import { postJson, usePoll, type Lockdown, type Monitor, type MonitorTx } from "../api";
 import { Card, Empty, Stat, TxLink, short, timeAgo } from "./ui";
 
 const ROLE_TEXT: Record<string, string> = { treasury: "Treasury", hot_wallet: "Hot wallet" };
@@ -12,10 +12,13 @@ function party(address?: string, role?: string | null) {
 
 export function AlertBanner() {
   const { data, refresh } = usePoll<Monitor>("/api/monitor");
+  const lock = usePoll<Lockdown>("/api/lockdown");
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
+  const [confirming, setConfirming] = useState(false);
   const alerts = data?.open_alerts ?? [];
-  if (alerts.length === 0) return null;
+  const contained = lock.data?.locked ? lock.data.containment : null;
+  if (alerts.length === 0 && !contained) return null;
 
   const ack = async (hash: string) => {
     setBusy(hash);
@@ -27,6 +30,21 @@ export function AlertBanner() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(undefined);
+    }
+  };
+
+  // 只有人点了按钮、再点确认才会执行；没有任何自动触发
+  const contain = async () => {
+    setBusy("contain");
+    setError(undefined);
+    try {
+      await postJson("/api/lockdown/contain", { confirm: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setConfirming(false);
+      setBusy(undefined);
+      await lock.refresh();
     }
   };
 
@@ -54,7 +72,81 @@ export function AlertBanner() {
             </button>
           </div>
         ))}
+        {contained ? (
+          <div data-testid="contained" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="rounded bg-white px-2 py-0.5 text-xs font-bold tracking-wider text-rose-700">CONTAINED</span>
+            <span><b>Contained:</b> payments are paused, {contained.amount_xrp} XRP returned to the treasury</span>
+            <a href={contained.explorer_url} target="_blank" rel="noreferrer" className="font-mono text-xs underline decoration-white/60 hover:decoration-white">
+              {short(contained.tx_hash, 10)} ↗
+            </a>
+            {contained.result && contained.result !== "tesSUCCESS" && <span className="text-xs text-rose-100">({contained.result})</span>}
+          </div>
+        ) : confirming ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-rose-900/60 px-3 py-2 text-sm">
+            <span>Contain will <b>pause all payments</b> and move the hot wallet balance (minus reserve and fee) back to the treasury. Continue?</span>
+            <button onClick={contain} disabled={busy === "contain"}
+                    className="rounded-md bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+              {busy === "contain" ? "Containing…" : "Yes, contain now"}
+            </button>
+            <button onClick={() => setConfirming(false)} disabled={busy === "contain"} className="text-xs text-rose-100 hover:text-white">Cancel</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 text-sm">
+            <button onClick={() => setConfirming(true)}
+                    className="rounded-md bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-50">Contain</button>
+            <span className="text-xs text-rose-100">Pause all payments and pull the hot wallet funds back to the treasury</span>
+          </div>
+        )}
         {error && <p className="text-xs text-rose-100">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** 锁定期间所有页面顶部显示；只能在这里手动解除（记入审计）。 */
+export function LockdownBar() {
+  const { data, refresh } = usePoll<Lockdown>("/api/lockdown");
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  if (!data?.locked) return null;
+
+  const release = async () => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await postJson("/api/lockdown/release", { note: "Lockdown released from the console" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+      await refresh();
+    }
+  };
+
+  return (
+    <div data-testid="lockdown-bar" className="border-b border-amber-500/60 bg-amber-400 text-slate-950">
+      <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-4 gap-y-2 px-6 py-2.5 text-sm">
+        <span className="rounded bg-slate-950 px-2 py-0.5 text-xs font-bold tracking-wider text-amber-300">LOCKDOWN</span>
+        <span><b>Payments are paused.</b> Every payment request is denied and pending approvals cannot be approved.</span>
+        {data.locked_at && <span className="text-xs text-slate-800">since {timeAgo(data.locked_at)}</span>}
+        {confirming ? (
+          <span className="ml-auto flex items-center gap-3">
+            <span className="text-xs">Release the lockdown and resume payments?</span>
+            <button onClick={release} disabled={busy}
+                    className="rounded-md bg-slate-950 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-slate-800 disabled:opacity-50">
+              {busy ? "Releasing…" : "Yes, release"}
+            </button>
+            <button onClick={() => setConfirming(false)} className="text-xs text-slate-800 hover:text-slate-950">Cancel</button>
+          </span>
+        ) : (
+          <button onClick={() => setConfirming(true)}
+                  className="ml-auto rounded-md border border-slate-950/70 px-3 py-1 text-xs font-semibold hover:bg-slate-950/10">
+            Release lockdown
+          </button>
+        )}
+        {error && <span className="w-full text-xs text-rose-800">{error}</span>}
       </div>
     </div>
   );

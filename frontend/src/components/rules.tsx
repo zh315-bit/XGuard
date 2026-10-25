@@ -1,6 +1,7 @@
 /** 规则编号 → 人话。界面默认显示人话，编号只放在悬停提示里。 */
 export const RULE_TEXT: Record<string, string> = {
   DEFAULT: "All checks passed, paid automatically",
+  LOCKDOWN: "Security incident in progress; payments are paused",
   PROBE: "Fetching the resource failed (error status, connection failure or timeout); nothing was paid",
   R0: "The merchant's quote is malformed and cannot be evaluated; denied",
   R1: "Network, asset or payment scheme not supported; denied",
