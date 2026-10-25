@@ -220,18 +220,18 @@ def no_backoff(monkeypatch):
 
 
 def test_agent_retries_mid_stream_disconnect(no_backoff):
-    model = FlakyModel(failures=4)
+    model = FlakyModel(failures=3)
     agent_module, agent = make_agent(model)
-    assert agent_module.LLM_MAX_RETRIES == 4
-    assert "周报写好了" in str(agent("写周报")) and model.calls == 5
+    assert agent_module.LLM_MAX_RETRIES == 3
+    assert "周报写好了" in str(agent("写周报")) and model.calls == 4
 
 
 def test_agent_gives_up_after_max_retries(no_backoff):
-    model = FlakyModel(failures=5)
+    model = FlakyModel(failures=4)
     agent_module, agent = make_agent(model)
     with pytest.raises(Exception) as exc:
         agent("写周报")
-    assert model.calls == 5 and agent_module.llm_failure_kind(exc.value) == "network"
+    assert model.calls == 4 and agent_module.llm_failure_kind(exc.value) == "network"
 
 
 def test_agent_progress_summary():
@@ -262,3 +262,12 @@ def test_slow_but_alive_stream_is_not_a_timeout(fake_api, monkeypatch):
 def test_stream_with_steady_chunks_succeeds(fake_api):
     fake_api.outcomes = ["OK"]
     assert llm.create_message("risk_explainer", model="m") == "OK" and fake_api.calls == 1
+
+
+def test_agent_read_timeout_outlasts_silent_thinking(monkeypatch):
+    """思考期间流里没有数据：读取超时要足够长，连接超时要短。"""
+    agent_module = load_agent_module()
+    monkeypatch.setitem(agent_module.CONFIG, "ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setitem(agent_module.CONFIG, "AGENT_MODEL_PROVIDER", "anthropic")
+    timeout = agent_module.build_model().client.timeout
+    assert timeout.read >= 300 and timeout.connect <= 15

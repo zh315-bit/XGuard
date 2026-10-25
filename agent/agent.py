@@ -63,10 +63,12 @@ def task_prompt() -> str:
 
 # ---- 模型：可配置，现在用 Anthropic API，之后切到 Bedrock 只改 .env ----
 
-# 单次请求（流式时是两段数据之间）最多等 60 秒，避免连接半断时一直挂着。正常首字 2 秒内；
-# API 偶尔会整段卡住，30 秒 × 3 次（约 100 秒）不够撑过一次短暂波动，任务被白白中止
-LLM_TIMEOUT_SECONDS = 60
-LLM_MAX_RETRIES = 4        # 暂时性错误最多重试 4 次（共 5 次，间隔 2/4/8/16 秒），之后任务中止
+# 流式读取时两段数据之间最多等多久。Opus 5.5 的思考始终开启、默认不回传思考内容（display "omitted"），
+# 思考期间流里没有任何数据：写最终报告前上下文长、想得久，60 秒内一个字节都不来是正常的，
+# 太短的读取超时会在它想完之前把请求掐断、重试时又从头想。连接超时单独设短，真断网仍能很快发现。
+LLM_READ_TIMEOUT_SECONDS = 300
+LLM_CONNECT_TIMEOUT_SECONDS = 15
+LLM_MAX_RETRIES = 3        # 暂时性错误最多重试 3 次（共 4 次，间隔 2/4/8 秒），之后任务中止
 
 
 def llm_error_kind(exc: BaseException) -> Optional[str]:
@@ -117,7 +119,7 @@ class TransientLLMRetry(ModelRetryStrategy):
     """Strands 默认只重试限速；这里把超时、网络中断、过载、5xx 也算上，次数有限。"""
 
     def __init__(self) -> None:
-        super().__init__(max_attempts=LLM_MAX_RETRIES + 1, initial_delay=2, max_delay=16)
+        super().__init__(max_attempts=LLM_MAX_RETRIES + 1, initial_delay=2, max_delay=8)
 
     def is_retryable(self, exception: Exception) -> bool:
         retryable = llm_error_kind(exception) is not None
@@ -129,12 +131,14 @@ class TransientLLMRetry(ModelRetryStrategy):
 def build_model():
     provider = (CONFIG["AGENT_MODEL_PROVIDER"] or "anthropic").lower()
     if provider == "anthropic":
+        import anthropic
         from strands.models.anthropic import AnthropicModel
         if not CONFIG["ANTHROPIC_API_KEY"]:
             sys.exit("Missing ANTHROPIC_API_KEY: put it in .env or export it, then run again")
         return AnthropicModel(
             # 重试交给 TransientLLMRetry 统一控制（流式中途断开也能重试），SDK 自己不再重试
-            client_args={"api_key": CONFIG["ANTHROPIC_API_KEY"], "timeout": LLM_TIMEOUT_SECONDS, "max_retries": 0},
+            client_args={"api_key": CONFIG["ANTHROPIC_API_KEY"], "max_retries": 0,
+                         "timeout": anthropic.Timeout(LLM_READ_TIMEOUT_SECONDS, connect=LLM_CONNECT_TIMEOUT_SECONDS)},
             model_id=CONFIG["AGENT_MODEL_ID"] or "claude-opus-5-5",
             max_tokens=16000,
         )
