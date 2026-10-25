@@ -3,6 +3,7 @@ import { RuleText } from "../components/rules";
 import { DemoDeviceNotice } from "../components/DemoDeviceNotice";
 import { postJson, usePoll, type AuditRow, type Escrow, type Treasury as TreasuryT } from "../api";
 import { EscrowTimeline } from "../components/EscrowTimeline";
+import { MonitorCard } from "../components/Monitor";
 import { SettingsCard } from "../components/SettingsCard";
 import { Card, Empty, ErrorLine, Stat, TxLink, VerdictBadge, short } from "../components/ui";
 
@@ -39,6 +40,8 @@ export function Treasury() {
 
         </>
       )}
+
+      <MonitorCard />
 
       {escrows && escrows.length > 0 && (
         <Card title={`Escrow（${escrows.length}）`}>

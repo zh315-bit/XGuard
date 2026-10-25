@@ -47,7 +47,7 @@ uv pip install --python .venv/bin/python -e ".[agent,dev]" --override overrides.
 (cd frontend && npm install)
 .venv/bin/python scripts/setup_wallets.py      # create 6 accounts from the faucet and generate .env
 .venv/bin/python scripts/issue_creds.py        # issue on-chain credentials to merchant_a / merchant_b
-scripts/start_all.sh                           # Speculos + merchants + guard API + console
+scripts/start_all.sh                           # Speculos + merchants + guard API + sentinel + console
 .venv/bin/python scripts/lock_treasury.py      # hand the treasury Regular Key to the Ledger (Speculos); optionally disable the master key
 ```
 
@@ -63,6 +63,13 @@ Live demo (narrated step by step in the terminal; B and E pause until you sign w
 ```bash
 .venv/bin/python scripts/demo_run.py            # merchant E defaults to garbage: verification fails, auto refund after 75 s
 .venv/bin/python scripts/demo_run.py --e-mode normal
+```
+
+Simulate a compromised server (bypasses the guard and pays a stranger 0.01 XRP straight from the hot wallet key; the
+sentinel flags it and a red UNAUTHORIZED banner appears on every console page):
+
+```bash
+.venv/bin/python scripts/simulate_compromise.py  # DEMO_MODE=true only, asks you to type yes
 ```
 
 Stop: `scripts/stop_all.sh`. Tests: `.venv/bin/python -m pytest tests/`.
@@ -106,6 +113,7 @@ which is why uv is used here.
 | Verify before release | `guard/escrow.py`, `guard/delivery_verifier.py`, `merchants/escrow_merchant.py` |
 | Hot wallet cap / top-ups | `guard/hot_wallet.py`, `scripts/cap_hot_wallet.py` |
 | MCP server / agent | `guard/mcp_server.py`, `agent/agent.py` |
+| Independent sentinel (Quicknode WSS live monitor, separate process) | `watchdog/sentinel.py`, `guard/monitor.py` |
 | Console | `frontend/` |
 
 ## Probing a resource
@@ -125,6 +133,42 @@ server can spend directly.
 - `hot_wallet_max_balance_xrp` (default 20 XRP): `scripts/cap_hot_wallet.py` sends anything above the cap back to the treasury, with the audit Memo `agentguard/hot-wallet`.
 - Top-ups can only come from the treasury: started from the Treasury page in the console → an approval request is created → human approval + Ledger signature. The latest on-chain balance is checked both when the top-up is requested and before signing; the balance after the top-up may not exceed the cap.
 - The treasury's Regular Key is the Ledger device and its master key is disabled, so every treasury payment needs a device signature (in this demo the device is Speculos running on the same machine; see "Security boundaries").
+
+## Quicknode: RPC for the guard, WSS for an independent sentinel
+
+All XRPL access goes through a Quicknode XRPL Testnet endpoint, configured in `.env`:
+
+| Variable | Used by | For |
+|---|---|---|
+| `XRPL_RPC_URL` (https) | guard API, MCP server, scripts | quote validation (payee credentials, escrow lookups), autofill and transaction submission, settlement confirmation and reconciliation by hash, balances |
+| `XRPL_WSS_URL` (wss, same endpoint) | `watchdog/sentinel.py` only | real-time subscription to the treasury and hot wallet for independent monitoring |
+
+**Why a separate sentinel.** The guard can only check payments that go through its own code. If the server is
+compromised and the hot wallet key is used directly, nothing reaches the guard — only the ledger sees it. The sentinel
+runs as its own process (`start_all.sh` starts it, `stop_all.sh` stops it), subscribes to both accounts over WSS and
+reconciles every validated transaction against the guard database:
+
+- **Outgoing** (sent by the treasury or hot wallet) with an authorized record → `matched`: x402 payments, top-ups and
+  escrow locks by the transaction hash the guard records before submitting; escrow release / refund by escrow
+  owner + sequence (their hashes are written only after submission); hot wallet → treasury sweeps (`cap_hot_wallet.py`).
+- **Outgoing without a record** → `UNAUTHORIZED`: an audit event is written (`audit_events`), an alert is raised (log,
+  plus an optional `SENTINEL_ALERT_WEBHOOK_URL`), and the console shows a red banner on every page with the hash and an
+  explorer link until someone clicks "Mark as handled". A short grace period (`SENTINEL_GRACE_SECONDS`, default 2 s)
+  covers the window between a transaction validating and the guard writing its record.
+- **Incoming** (refunds, top-ups seen from the receiving side, deposits) → recorded only.
+- **Reconnects** with exponential backoff; it also reconnects when no new ledger arrives for 20 s. After reconnecting
+  it subscribes first, then backfills with `account_tx` from the last processed ledger, de-duplicating by hash, so
+  nothing validated while it was disconnected is missed.
+
+Its status (connected / reconnecting / stale / not running) shows in the **Quicknode live monitor** card on the
+Treasury & Audit page and in `GET /health`. The sentinel only reads the guard's tables and writes its own; it never
+signs or changes a payment. Operator actions that bypass the guard on purpose (e.g. `lock_treasury.py`) will also be
+flagged — that is intended; mark them as handled.
+
+**Production.** Here the sentinel shares the server and database with the guard, so a full compromise could also
+silence it. In production, use **Quicknode Webhooks** (Streams filtered on the treasury and hot wallet addresses) to push
+transactions to an alerting service deployed separately from the guard, with its own credentials and a read-only copy of
+the authorized-transaction records.
 
 ## Verify before release: an escrow extension to x402 (not standard x402)
 

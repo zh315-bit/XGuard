@@ -240,3 +240,43 @@ export type AuditRow = {
   explorer_url?: string;
   payer?: string | null;
 };
+
+export type MonitorTx = {
+  hash: string;
+  ledger_index?: number;
+  close_time?: number;
+  seen_at: number;
+  source: "stream" | "backfill";
+  account?: string;
+  destination?: string;
+  account_role?: string | null;
+  destination_role?: string | null;
+  tx_type?: string;
+  amount?: string;
+  result?: string;
+  direction: "outgoing" | "incoming";
+  status: "pending" | "matched" | "UNAUTHORIZED" | "incoming";
+  match_kind?: string;
+  match_ref?: string;
+  flagged_at?: number;
+  acknowledged_at?: number;
+  explorer_url: string;
+};
+
+export type Monitor = {
+  health: {
+    status: "connected" | "connecting" | "reconnecting" | "disconnected" | "stale" | "stopped" | "offline";
+    heartbeat_age_seconds?: number | null;
+    endpoint?: string | null;
+    cursor_ledger?: number | null;
+    reconnects: number;
+    last_error?: string | null;
+    connected_since?: number | null;
+    last_backfill?: { from_ledger: number; found: number; ts: number } | null;
+    grace_seconds: number;
+  };
+  counts: { matched: number; unauthorized: number; incoming: number; pending: number };
+  recent: MonitorTx[];
+  open_alerts: MonitorTx[];
+  watched: { address: string; role: string }[];
+};

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Backdrop } from "./components/Backdrop";
 import { LLMStatus } from "./components/LLMStatus";
+import { AlertBanner } from "./components/Monitor";
 import { usePoll, type Approval, type Config } from "./api";
 import { Approvals } from "./pages/Approvals";
 import { Mission } from "./pages/Mission";
@@ -38,6 +39,7 @@ export function App() {
   return (
     <div className="relative isolate min-h-screen text-slate-100">
       <Backdrop />
+      <AlertBanner />
       <header className="border-b border-slate-800/70 bg-slate-950/50 backdrop-blur">
         <div className="mx-auto flex max-w-[1500px] items-center gap-8 px-6 py-4">
           <div className="flex items-center gap-3">

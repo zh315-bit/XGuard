@@ -161,6 +161,41 @@ CREATE TABLE IF NOT EXISTS budget_reservations (
     created_at  REAL NOT NULL,
     expires_at  REAL NOT NULL           -- 超时仍停在付款前阶段则释放
 );
+CREATE TABLE IF NOT EXISTS monitor_txs (   -- 独立哨兵（watchdog/sentinel.py）对账过的链上交易
+    hash        TEXT PRIMARY KEY,
+    ledger_index INTEGER,
+    close_time  REAL,                   -- 账本关闭时间（unix 秒）
+    seen_at     REAL NOT NULL,          -- 哨兵收到的时间
+    source      TEXT NOT NULL,          -- stream（实时订阅）/ backfill（重连后 account_tx 补查）
+    account     TEXT,                   -- 发起账户
+    destination TEXT,
+    tx_type     TEXT,
+    amount      TEXT,                   -- "0.01 XRP" / "5 USD.rIssuer…"
+    result      TEXT,                   -- tesSUCCESS / tec…
+    owner       TEXT,                   -- EscrowFinish / EscrowCancel 的 Owner、OfferSequence
+    offer_sequence INTEGER,
+    watched     TEXT,                   -- 涉及的受监控账户：treasury / hot_wallet（逗号分隔）
+    direction   TEXT NOT NULL,          -- outgoing（受监控账户发起）/ incoming
+    status      TEXT NOT NULL,          -- pending（宽限期内）/ matched / UNAUTHORIZED / incoming
+    match_kind  TEXT,                   -- x402 / topup / escrow-lock / escrow-release / escrow-refund / hot-wallet-cap / audit
+    match_ref   TEXT,
+    flagged_at  REAL,
+    acknowledged_at REAL,
+    ack_note    TEXT
+);
+CREATE TABLE IF NOT EXISTS monitor_state (
+    key         TEXT PRIMARY KEY,       -- status / cursor_ledger / heartbeat / last_error / reconnects …
+    value       TEXT,
+    updated_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS audit_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          REAL NOT NULL,
+    created_at  TEXT NOT NULL,
+    kind        TEXT NOT NULL,          -- unauthorized_tx / alert_acknowledged
+    tx_hash     TEXT,
+    detail      TEXT
+);
 """
 
 # 旧库升级：CREATE TABLE IF NOT EXISTS 不会补列，这里按需 ALTER

@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from guard import (approval_service, approvals, audit, budget, credentials, escrow, hot_wallet, llm, maintenance,
-                   mission_runner, missions, payments, policy, policy_settings, report, treasury, views)
+                   mission_runner, missions, monitor, payments, policy, policy_settings, report, treasury, views)
 from guard.approval_service import ApprovalError
 from guard.policy_settings import PolicyValidationError
 from guard.config import env
@@ -98,6 +98,10 @@ class MissionEventBody(BaseModel):
 class MissionFinishBody(BaseModel):
     status: Literal["done", "failed", "llm_unavailable"] = "done"
     report: Optional[str] = Field(default=None, max_length=20000)
+
+
+class AckBody(BaseModel):
+    note: str = Field(default="Handled by the operator", max_length=300)
 
 
 class LLMEventBody(BaseModel):
@@ -218,6 +222,28 @@ def get_treasury() -> dict[str, Any]:
     """Treasury & Audit：预算（已花 / 预留 / 剩余）、热钱包和金库余额、金库是否已交给设备、主密钥状态。"""
     cfg = policy.load_policy()
     return {**treasury.status(), "budget": budget.summary(cfg), "budget_detail": budget.detail_today()}
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    """健康检查：守卫 API 本身 + 独立哨兵的连接状态（哨兵断线不影响 API 的 200，但会如实显示）。"""
+    sentinel = monitor.health()
+    return {"api": "ok", "sentinel": sentinel["status"], "sentinel_endpoint": sentinel["endpoint"],
+            "sentinel_heartbeat_age_seconds": sentinel["heartbeat_age_seconds"]}
+
+
+@app.get("/api/monitor")
+def get_monitor() -> dict[str, Any]:
+    """独立哨兵（watchdog/sentinel.py）的连接状态和对账结果。哨兵是另一个进程，这里只读它写的表。"""
+    return monitor.view()
+
+
+@app.post("/api/monitor/alerts/{tx_hash}/ack")
+def ack_alert(tx_hash: str, body: Optional[AckBody] = None) -> dict[str, Any]:
+    row = monitor.acknowledge(tx_hash, (body or AckBody()).note)
+    if row is None or row["status"] != monitor.UNAUTHORIZED:
+        raise HTTPException(404, "No UNAUTHORIZED alert with this tx hash")
+    return row
 
 
 class SettingsBody(BaseModel):
