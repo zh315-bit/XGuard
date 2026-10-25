@@ -43,9 +43,9 @@ export function App() {
       <header className="border-b border-slate-800/70 bg-slate-950/50 backdrop-blur">
         <div className="mx-auto flex max-w-[1500px] items-center gap-8 px-6 py-4">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="AgentGuard" className="h-10 w-10 rounded-xl shadow-md shadow-sky-500/20 ring-1 ring-slate-800" />
+            <img src="/logo.png" alt="XGuard" className="h-10 w-10 rounded-xl shadow-md shadow-sky-500/20 ring-1 ring-slate-800" />
             <div>
-              <div className="text-sm font-semibold tracking-wide">AgentGuard</div>
+              <div className="text-sm font-semibold tracking-wide">XGuard</div>
               <div className="text-[11px] text-slate-500">Payment guard for AI agents · XRPL Testnet</div>
             </div>
           </div>
