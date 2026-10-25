@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/* 亮色主题：整个控制台原本按深色写的（slate-950 底、slate-100 字、*-300 强调色）。
+   这里把调色板就地反转，组件里的类名不用改：
+   - slate 整体反转：950 → 页面浅底，900 → 白色卡片，100 → 深色正文；
+   - 强调色只把浅色端（50–400）换成对应的深色（950–600），500 及以上保持原样，
+     所以 bg-*-500 按钮、bg-*-500/15 徽章不变，text-*-300 文字变成深色、在浅底上可读。 */
+@theme {
+  --color-slate-950: oklch(98.4% 0.003 247.858);
+  --color-slate-900: oklch(100% 0 0);
+  --color-slate-800: oklch(92.9% 0.013 255.508);
+  --color-slate-700: oklch(86.9% 0.022 252.894);
+  --color-slate-600: oklch(70.4% 0.04 256.788);
+  --color-slate-400: oklch(44.6% 0.043 257.281);
+  --color-slate-300: oklch(37.2% 0.044 257.287);
+  --color-slate-200: oklch(27.9% 0.041 260.031);
+  --color-slate-100: oklch(20.8% 0.042 265.755);
+  --color-slate-50: oklch(12.9% 0.042 264.695);
+  --color-sky-50: oklch(29.3% 0.066 243.157);
+  --color-sky-100: oklch(39.1% 0.09 240.876);
+  --color-sky-200: oklch(44.3% 0.11 240.79);
+  --color-sky-300: oklch(50% 0.134 242.749);
+  --color-sky-400: oklch(58.8% 0.158 241.966);
+  --color-emerald-50: oklch(26.2% 0.051 172.552);
+  --color-emerald-100: oklch(37.8% 0.077 168.94);
+  --color-emerald-200: oklch(43.2% 0.095 166.913);
+  --color-emerald-300: oklch(50.8% 0.118 165.612);
+  --color-emerald-400: oklch(59.6% 0.145 163.225);
+  --color-amber-50: oklch(27.9% 0.077 45.635);
+  --color-amber-100: oklch(41.4% 0.112 45.904);
+  --color-amber-200: oklch(47.3% 0.137 46.201);
+  --color-amber-300: oklch(55.5% 0.163 48.998);
+  --color-amber-400: oklch(66.6% 0.179 58.318);
+  --color-rose-50: oklch(27.1% 0.105 12.094);
+  --color-rose-100: oklch(41% 0.159 10.272);
+  --color-rose-200: oklch(45.5% 0.188 13.697);
+  --color-rose-300: oklch(51.4% 0.222 16.935);
+  --color-rose-400: oklch(58.6% 0.253 17.585);
+  --color-violet-50: oklch(28.3% 0.141 291.089);
+  --color-violet-100: oklch(38% 0.189 293.745);
+  --color-violet-200: oklch(43.2% 0.232 292.759);
+  --color-violet-300: oklch(49.1% 0.27 292.581);
+  --color-violet-400: oklch(54.1% 0.281 293.009);
+  --color-orange-50: oklch(26.6% 0.079 36.259);
+  --color-orange-100: oklch(40.8% 0.123 38.172);
+  --color-orange-200: oklch(47% 0.157 37.304);
+  --color-orange-300: oklch(55.3% 0.195 38.402);
+  --color-orange-400: oklch(64.6% 0.222 41.116);
+}
+
+:root {
+  color-scheme: light;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+/* 周报（Markdown）在深色背景下的排版 */
+.report h1 { @apply text-xl font-semibold text-slate-100 mt-2 mb-3; }
+.report h2 { @apply text-base font-semibold text-slate-100 mt-5 mb-2; }
+.report p, .report li { @apply text-sm leading-6 text-slate-300; }
+.report ul { @apply list-disc pl-5 my-2; }
+.report table { @apply w-full text-sm my-3 border-collapse; }
+.report th { @apply text-left text-slate-400 font-medium border-b border-slate-700 py-1.5 pr-3; }
+.report td { @apply border-b border-slate-800 py-1.5 pr-3 text-slate-300 align-top; }
+.report code { @apply text-xs bg-slate-800 rounded px-1 py-0.5 text-slate-200 break-all; }
+.report a { @apply text-sky-400 hover:underline break-all; }
+.report blockquote { @apply border-l-2 border-amber-500/60 pl-3 my-2 text-slate-400; }
+.report strong { @apply text-slate-100; }
+.report > :first-child { @apply mt-0; }
+.report > :last-child { @apply mb-0; }
+.report h3 { @apply text-sm font-semibold text-slate-100 mt-4 mb-1.5; }
+.report p { @apply my-2; }
+.report ol { @apply list-decimal pl-5 my-2; }
+.report hr { @apply my-4 border-slate-800; }
+.report thead { @apply bg-slate-950/60; }
+.report th { @apply whitespace-nowrap; }
+.report th, .report td { @apply first:pl-2; }
+
+/* ---- 全局背景（components/Backdrop.tsx）的动画 ---- */
+@keyframes aurora-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(6vw, 4vh) scale(1.08); }
+  66% { transform: translate(-4vw, 6vh) scale(0.95); }
+}
+@keyframes coin-rise {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(-115vh) rotate(25deg); opacity: 0; }
+}
+.backdrop .aurora { animation: aurora-drift 28s ease-in-out infinite; will-change: transform; }
+.backdrop .aurora-2 { animation-duration: 36s; animation-direction: reverse; }
+.backdrop .aurora-3 { animation-duration: 44s; }
+.backdrop .coin { animation: coin-rise linear infinite; }
+.backdrop .candle { transition: fill 0.4s, stroke 0.4s; }   /* 红绿切换时渐变，不闪 */
+@media (prefers-reduced-motion: reduce) {
+  .backdrop * { animation: none !important; }
+  .backdrop .coin, .backdrop .pulse { display: none; }
+}
+
+/* 首页左栏（Mission 的 Layout）内部滚动时用细滚动条 */
+.sidebar-scroll { scrollbar-width: thin; scrollbar-color: var(--color-slate-700) transparent; }
+
+/* 处理进度时间线（components/queue.tsx）：当前所在步骤的圆圈跳动 + 波纹 */
+@keyframes step-hop {
+  0%, 60%, 100% { transform: translateY(0) scale(1); }
+  20% { transform: translateY(-5px) scale(1.08); }
+  35% { transform: translateY(0) scale(0.94); }
+  45% { transform: translateY(-1.5px) scale(1.02); }
+}
+@keyframes step-ping {
+  0% { transform: scale(1); opacity: 0.8; }
+  70%, 100% { transform: scale(1.9); opacity: 0; }
+}
+.step-hop { animation: step-hop 1.4s ease-in-out infinite; }
+.step-ping { animation: step-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .step-hop, .step-ping { animation: none; }
+}

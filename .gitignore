@@ -1,0 +1,14 @@
+.env
+.venv/
+data/
+__pycache__/
+
+# Speculos 设备 seed（只用于 testnet 演示）
+speculos/.seed
+frontend/node_modules/
+frontend/dist/
+
+# 本机生成的文件
+.DS_Store
+.pytest_cache/
+*.egg-info/

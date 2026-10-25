@@ -1,0 +1,31 @@
+# AgentGuard 策略。每次判定都会重新读取，demo 时可以现场改阈值。
+# 地址列表支持 ${ENV_VAR}，从 .env 展开；未定义的变量会被忽略。
+
+network: "xrpl:1"
+allowed_assets: ["XRP"]
+
+hard_cap_xrp: 50        # R7：超过直接 DENY
+auto_limit_xrp: 1       # R4：单笔自动付款上限
+daily_budget_xrp: 5     # R5：每日（UTC）自动付款预算，超出转人工审批
+daily_total_cap_xrp: 20 # 每日（UTC）总支出上限（自动 + 人工批准），人工批准也不能突破
+
+quote_ttl_seconds: 120  # 自动付款预算预留的有效期：付款前阶段卡住超过这个时间就释放
+approval_ttl_seconds: 120       # 审批单有效期，过期的报价不能再批准
+approval_ttl_seconds_demo: 300  # DEMO_MODE=true 时的审批单有效期（现场演示留足时间）
+                                # 环境变量 APPROVAL_TTL_SECONDS 可覆盖以上两项
+
+rate_limit:             # R6：同一收款地址的频率限制
+  window_seconds: 60
+  max_requests: 5
+
+hot_wallet_max_balance_xrp: 20  # 热钱包余额上限：服务器能直接动用的上限；超出部分用 scripts/cap_hot_wallet.py 转回金库
+
+escrow_threshold_xrp: 5             # 审批通过、金额超过它、且商户支持 escrow 的购买：先锁款，验货通过再放款
+escrow_cancel_after_seconds: 600    # escrow 的 CancelAfter（验货不通过时，过了这个时间才能退款）
+escrow_cancel_after_seconds_demo: 75    # DEMO_MODE=true 时用这个：现场演示约一分钟就能看到退款
+
+blacklist: []           # R2：命中直接 DENY
+
+merchant_credential:    # R3：收款地址必须持有该 issuer 签发、且已接受的链上凭证，否则 HOLD
+  issuer: ${ISSUER_ADDRESS}
+  type: AgentGuardVerifiedMerchant

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentguard"
+version = "0.1.0"
+description = "Payment guard between AI agents and XRPL wallets: x402 quotes are checked by policy before any payment (AUTO / HOLD / DENY)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "x402-xrpl==0.3.4",
+    "xrpl-py>=5.2,<6",
+    # x402-xrpl 0.3.4 锁了 fastapi<0.116 / uvicorn<0.31，与 mcp 2.x 冲突：安装时用 overrides.txt（见 README）
+    "fastapi>=0.133",
+    "uvicorn[standard]>=0.34",
+    "pyyaml",
+    "python-dotenv",
+    "requests",
+    "mcp>=2.1,<2.2",
+    "anthropic>=0.125",
+]
+
+[project.optional-dependencies]
+agent = ["strands-agents[anthropic]==1.62.0"]
+dev = ["pytest"]
+
+[project.scripts]
+agentguard-mcp = "agentguard.mcp:main"
+
+[tool.setuptools]
+packages = ["agentguard", "guard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,5 @@
+# x402-xrpl 0.3.4 锁了 fastapi<0.116 / uvicorn<0.31，与 mcp 2.x（经 sse-starlette 需要 starlette>=0.49.1、uvicorn>=0.31.1）冲突。
+# 实测 x402 商户中间件在下面的版本上工作正常（smoke test 4/4），所以覆盖它的上限。
+# 安装：uv pip install -r requirements.txt --override overrides.txt
+fastapi==0.162.0
+uvicorn[standard]==0.54.0

@@ -1,0 +1,11 @@
+# 安装：uv pip install -r requirements.txt --override overrides.txt（原因见 overrides.txt）
+x402-xrpl==0.3.4
+xrpl-py==5.2.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pyyaml
+python-dotenv
+requests
+mcp==2.1.1
+strands-agents[anthropic]==1.62.0
+pytest
