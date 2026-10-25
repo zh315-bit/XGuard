@@ -201,17 +201,18 @@ def no_backoff(monkeypatch):
 
 
 def test_agent_retries_mid_stream_disconnect(no_backoff):
-    model = FlakyModel(failures=2)
-    _, agent = make_agent(model)
-    assert "周报写好了" in str(agent("写周报")) and model.calls == 3
+    model = FlakyModel(failures=4)
+    agent_module, agent = make_agent(model)
+    assert agent_module.LLM_MAX_RETRIES == 4
+    assert "周报写好了" in str(agent("写周报")) and model.calls == 5
 
 
-def test_agent_gives_up_after_two_retries(no_backoff):
-    model = FlakyModel(failures=3)
+def test_agent_gives_up_after_max_retries(no_backoff):
+    model = FlakyModel(failures=5)
     agent_module, agent = make_agent(model)
     with pytest.raises(Exception) as exc:
         agent("写周报")
-    assert model.calls == 3 and agent_module.llm_failure_kind(exc.value) == "network"
+    assert model.calls == 5 and agent_module.llm_failure_kind(exc.value) == "network"
 
 
 def test_agent_progress_summary():

@@ -63,8 +63,10 @@ def task_prompt() -> str:
 
 # ---- 模型：可配置，现在用 Anthropic API，之后切到 Bedrock 只改 .env ----
 
-LLM_TIMEOUT_SECONDS = 30   # 单次请求（流式时是两段数据之间）最多等 30 秒，避免连接半断时一直挂着
-LLM_MAX_RETRIES = 2        # 暂时性错误最多重试 2 次（共 3 次），之后任务中止
+# 单次请求（流式时是两段数据之间）最多等 60 秒，避免连接半断时一直挂着。正常首字 2 秒内；
+# API 偶尔会整段卡住，30 秒 × 3 次（约 100 秒）不够撑过一次短暂波动，任务被白白中止
+LLM_TIMEOUT_SECONDS = 60
+LLM_MAX_RETRIES = 4        # 暂时性错误最多重试 4 次（共 5 次，间隔 2/4/8/16 秒），之后任务中止
 
 
 def llm_error_kind(exc: BaseException) -> Optional[str]:
@@ -115,7 +117,7 @@ class TransientLLMRetry(ModelRetryStrategy):
     """Strands 默认只重试限速；这里把超时、网络中断、过载、5xx 也算上，次数有限。"""
 
     def __init__(self) -> None:
-        super().__init__(max_attempts=LLM_MAX_RETRIES + 1, initial_delay=2, max_delay=8)
+        super().__init__(max_attempts=LLM_MAX_RETRIES + 1, initial_delay=2, max_delay=16)
 
     def is_retryable(self, exception: Exception) -> bool:
         retryable = llm_error_kind(exception) is not None
