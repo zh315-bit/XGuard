@@ -5,6 +5,29 @@ first fetches the quote and decides, according to policy, **AUTO** (paid automat
 **HOLD** (human approval + Ledger signature) / **DENY** (refused). Every decision is recorded in an audit log, and every
 transaction the guard signs carries an on-chain Memo. The agent never gets access to private keys.
 
+## Screenshots
+
+The console (UI text is in Chinese), captured during a "weekly report" mission: data source A was paid automatically,
+and B (8 XRP, above the 1 XRP auto limit) is waiting for human approval.
+
+**Mission**: start a mission, see today's spend report and every step the agent takes.
+
+![Mission page](docs/images/mission.png)
+
+**Approvals**: the HOLD payment with its LLM risk explanation (read-only, cannot change the verdict), the acceptance
+terms bound to the quote hash, the processing timeline, and the Ledger device (Speculos) used for signing.
+
+![Approvals page](docs/images/approvals.png)
+
+**Payment Queue**: every payment request and how far it has progressed.
+
+![Payment Queue page](docs/images/queue.png)
+
+**Treasury & Audit**: security boundaries, on-chain treasury configuration (master key disabled, Regular Key on the
+device, hot wallet cap), budget usage, and the payment-rule settings panel.
+
+![Treasury & Audit page](docs/images/treasury.png)
+
 ## Security boundaries
 
 > ⚠ **This demo uses the Speculos emulator instead of a real Ledger: the private key lives on this machine and is for demo purposes only.**
