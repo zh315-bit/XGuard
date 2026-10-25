@@ -44,7 +44,9 @@ export class LedgerDevice {
   static async connect(url = DEFAULT_SPECULOS_URL, model = DeviceModelId.STAX): Promise<LedgerDevice> {
     const dmk = new DeviceManagementKitBuilder().addTransport(speculosTransportFactory(url, false, model)).build();
     const device = await firstValueFrom(dmk.startDiscovering({ transport: speculosIdentifier }));
-    const sessionId = await dmk.connect({ device });
+    // 关掉会话的后台轮询（默认每秒发一次 GetAppAndVersion）。设备停在签名审核界面时收到这条 APDU，
+    // XRP app 会回 0x6901，把正在等人确认的签名打断；另一个标签页或没关掉的旧会话的轮询同样会打断。
+    const sessionId = await dmk.connect({ device, sessionRefresherOptions: { isRefresherDisabled: true } });
     const signer = new SignerXrpBuilder({ dmk, sessionId }).build();
     return new LedgerDevice(dmk, sessionId, signer);
   }

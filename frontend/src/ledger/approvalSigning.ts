@@ -20,6 +20,13 @@ function connectOnce(config: Config): Promise<LedgerDevice> {
   return device;
 }
 
+/** 出错后断开并关闭旧会话，下次重新连接；不留下仍在和设备通信的会话。 */
+function dropDevice(): void {
+  const old = device;
+  device = undefined;
+  old?.then((d) => d.close()).catch(() => undefined);
+}
+
 export async function approveWithLedger(approval: Approval, config: Config, onStatus: DeviceStatus,
                                         confirmPayeeSuffix?: string): Promise<void> {
   // 之前已批准（比如在命令行），签名请求还在等：直接签
@@ -45,7 +52,7 @@ export async function approveWithLedger(approval: Approval, config: Config, onSt
     const ledger = await connectOnce(config);
     signature = await ledger.signTransaction(request.unsigned_tx_hex, onStatus);
   } catch (e) {
-    device = undefined;
+    dropDevice();
     const reason = e instanceof Error ? e.message : String(e);
     await postJson(`/approvals/${approval.id}/signature/cancel`, { reason: `Device signing failed: ${reason}` }).catch(() => undefined);
     throw new Error(reason.includes("6985") ? "Signing was rejected on the device" : reason);
