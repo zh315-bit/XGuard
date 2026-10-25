@@ -143,15 +143,19 @@ def probe() -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             result = {"ok": False, "kind": classify(exc)[0], "detail": str(exc)[:300]}
     result["kind_text"] = KIND_TEXT.get(result.get("kind")) if result.get("kind") else None
+    result["ts"] = now
     _probe_cache.update(ts=now, result=result)
     return result
 
 
 def status() -> dict[str, Any]:
-    """控制台状态灯：探测失败，或最近 10 分钟内有来源以失败结束（之后没有成功），都算不可用。"""
+    """控制台状态灯：探测失败，或最近 10 分钟内有来源以失败结束、且之后还没有成功的探测，都算不可用。
+    失败之后探测已经成功，说明 API 恢复了：不再亮红灯（agent 一次任务只调一轮，否则失败会一直挂着）。
+    失败记录仍保留在 calls 里。"""
     p = probe()
     calls = recent()
-    failing = [c for c in calls if not c["ok"] and time.time() - c["ts"] < 600]
+    recovered_at = p.get("ts", 0) if p["ok"] else 0
+    failing = [c for c in calls if not c["ok"] and time.time() - c["ts"] < 600 and c["ts"] > recovered_at]
     ok = p["ok"] and not failing
     if not p["ok"]:
         reason = p["kind_text"]

@@ -432,7 +432,7 @@ def demo_reset() -> dict[str, Any]:
     if mission_runner.running_mission():
         raise HTTPException(409, "A mission is running: cancel it or wait for it to finish before resetting")
     tables = ("escrows", "signing_requests", "budget_reservations", "approvals", "payment_requests", "decisions",
-              "mission_events", "missions")
+              "mission_events", "missions", "llm_status")
     unlocked = False
     if lockdown.is_locked():
         lockdown.release("Released by demo reset")

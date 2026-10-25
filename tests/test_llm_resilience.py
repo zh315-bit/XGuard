@@ -125,6 +125,25 @@ def test_status_endpoint(fake_api, monkeypatch):
     assert client.get("/api/llm/status").json()["ok"] is True
 
 
+def test_successful_probe_after_a_failure_clears_the_light(fake_api, monkeypatch):
+    from guard.api import app
+    client = TestClient(app)
+    client.post("/api/llm/events", json={"ok": False, "kind": "timeout", "detail": ""})
+    failed_at = llm.recent()[0]["ts"]
+
+    # 探测发生在失败之前（缓存）：仍然亮红灯
+    monkeypatch.setattr(llm, "probe", lambda: {"ok": True, "latency_ms": 5, "kind_text": None, "ts": failed_at - 1})
+    assert client.get("/api/llm/status").json()["ok"] is False
+    # 失败之后探测成功：API 已恢复，状态灯转绿，失败记录还在
+    monkeypatch.setattr(llm, "probe", lambda: {"ok": True, "latency_ms": 5, "kind_text": None, "ts": failed_at + 1})
+    status = client.get("/api/llm/status").json()
+    assert status["ok"] is True and status["reason"] is None
+    assert status["calls"][0]["ok"] is False and status["calls"][0]["source"] == "agent"
+    # 探测本身失败：照样红灯
+    monkeypatch.setattr(llm, "probe", lambda: {"ok": False, "kind_text": "request timed out", "ts": failed_at + 1})
+    assert client.get("/api/llm/status").json()["ok"] is False
+
+
 def test_probe_reports_unavailable(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
     llm._probe_cache.clear()
