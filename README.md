@@ -150,7 +150,8 @@ reconciles every validated transaction against the guard database:
 
 - **Outgoing** (sent by the treasury or hot wallet) with an authorized record → `matched`: x402 payments, top-ups and
   escrow locks by the transaction hash the guard records before submitting; escrow release / refund by escrow
-  owner + sequence (their hashes are written only after submission); hot wallet → treasury sweeps (`cap_hot_wallet.py`).
+  owner + sequence (their hashes are written only after submission); hot wallet → treasury sweeps (`cap_hot_wallet.py`);
+  Contain sweeps, by the hash registered before submission (see "Lockdown and Contain").
 - **Outgoing without a record** → `UNAUTHORIZED`: an audit event is written (`audit_events`), an alert is raised (log,
   plus an optional `SENTINEL_ALERT_WEBHOOK_URL`), and the console shows a red banner on every page with the hash and an
   explorer link until someone clicks "Mark as handled". A short grace period (`SENTINEL_GRACE_SECONDS`, default 2 s)
@@ -169,6 +170,40 @@ flagged — that is intended; mark them as handled.
 silence it. In production, use **Quicknode Webhooks** (Streams filtered on the treasury and hot wallet addresses) to push
 transactions to an alerting service deployed separately from the guard, with its own credentials and a read-only copy of
 the authorized-transaction records.
+
+## Lockdown and Contain
+
+When the sentinel raises an `UNAUTHORIZED` alert, the operator can stop everything with one button. Nothing here runs
+automatically: an alert alone never locks the guard or moves funds.
+
+![Unauthorized alert with the Contain button](docs/images/alert.png)
+
+**Contain** (red banner, with a second confirmation; `POST /api/lockdown/contain` with `{"confirm": true}`):
+
+1. The guard enters **lockdown** first.
+2. It then sends the hot wallet balance back to the treasury, keeping the account reserve and the transaction fee. The
+   transaction carries the audit Memo `agentguard/contain`.
+3. The transaction hash is registered in the guard database (`contained_txs`) after signing and **before** submission,
+   so the sentinel reconciles the sweep as `matched` (`contain`) instead of flagging it as another unauthorized transfer.
+4. The banner changes to "Contained: payments are paused, X XRP returned to the treasury", with a link to the sweep.
+
+![After Contain: lockdown bar and contained banner](docs/images/contained.png)
+
+**Lockdown** is stored in the database (`lockdown` table), so it survives a restart. While it is on:
+
+- every payment request is denied with rule `LOCKDOWN` ("Security incident in progress; payments are paused"), before
+  the merchant is even asked for a quote; payments already in progress are denied when re-evaluated before payment;
+- pending approvals cannot be approved (HTTP 423), device signatures are not accepted, and no hot wallet top-up can be requested;
+- every console page shows a LOCKDOWN bar.
+
+Lockdown can only be released by hand, with the **Release lockdown** button (second confirmation;
+`POST /api/lockdown/release`). Locking, the sweep and the release are written to `audit_events` as `lockdown_engaged`,
+`contain_sweep` and `lockdown_released`. After a release the hot wallet holds only its reserve, so automatic payments
+fail on chain until it is topped up from the treasury (approval + Ledger signature, see "Hot wallet balance cap").
+
+The two screenshots above use the data of a real run on testnet (alert `10E3D85F…`, sweep `D6A4D1A7…`, 18.779335 XRP
+returned); they were captured afterwards with the console's monitor and lockdown API responses replaced by that run's
+records, since the incident had already been handled.
 
 ## Verify before release: an escrow extension to x402 (not standard x402)
 
