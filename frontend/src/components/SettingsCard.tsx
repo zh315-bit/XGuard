@@ -29,7 +29,7 @@ export function SettingsCard() {
     try {
       const r = await postJson<Settings & { changed: string[] }>("/api/settings", { changes });
       setDirty(false);
-      setMsg({ text: r.changed.length ? `已保存 ${r.changed.length} 项，下一笔付款立即按新规则判断` : "没有变化" });
+      setMsg({ text: r.changed.length ? `Saved ${r.changed.length} change(s); the next payment is evaluated with the new rules` : "No changes" });
     } catch (e) {
       setMsg({ text: e instanceof Error ? e.message : String(e), bad: true });
     } finally {
@@ -40,7 +40,7 @@ export function SettingsCard() {
   const cancel = () => { setDirty(false); setMsg(undefined); };
 
   return (
-    <Card title="付款规则设置" right={<span className="text-xs text-slate-500">金额单位 XRP · 改完立即生效</span>}>
+    <Card title="Payment rules" right={<span className="text-xs text-slate-500">Amounts in XRP · takes effect immediately</span>}>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {(data?.fields ?? []).map((f) => (
           <label key={f.key} className="block rounded-lg border border-slate-800 bg-slate-950/50 px-4 py-3">
@@ -60,15 +60,15 @@ export function SettingsCard() {
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button onClick={save} disabled={busy || changedCount === 0}
                 className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-40">
-          保存{changedCount ? `（${changedCount} 项）` : ""}
+          Save{changedCount ? ` (${changedCount})` : ""}
         </button>
-        {dirty && <button onClick={cancel} className="text-sm text-slate-400 hover:text-slate-200">放弃修改</button>}
+        {dirty && <button onClick={cancel} className="text-sm text-slate-400 hover:text-slate-200">Discard changes</button>}
         {msg && <span className={`text-sm ${msg.bad ? "text-rose-300" : "text-emerald-300"}`}>{msg.text}</span>}
       </div>
 
       {data && data.history.length > 0 && (
         <div className="mt-5 border-t border-slate-800 pt-3">
-          <div className="mb-2 text-xs text-slate-500">修改记录</div>
+          <div className="mb-2 text-xs text-slate-500">Change history</div>
           <ul className="space-y-1 text-xs text-slate-400">
             {data.history.slice(0, 6).map((h) => (
               <li key={h.id}>

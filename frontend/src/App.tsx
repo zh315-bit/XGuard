@@ -44,7 +44,7 @@ export function App() {
             <img src="/logo.png" alt="AgentGuard" className="h-10 w-10 rounded-xl shadow-md shadow-sky-500/20 ring-1 ring-slate-800" />
             <div>
               <div className="text-sm font-semibold tracking-wide">AgentGuard</div>
-              <div className="text-[11px] text-slate-500">AI agent 支付守卫 · XRPL Testnet</div>
+              <div className="text-[11px] text-slate-500">Payment guard for AI agents · XRPL Testnet</div>
             </div>
           </div>
           <nav className="flex gap-1">
@@ -63,8 +63,8 @@ export function App() {
           </nav>
           <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
             <LLMStatus />
-            {config && <span>签名：{config.signer_mode === "speculos" ? "Ledger（Speculos）" : "服务器（备用）"}</span>}
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />每 2 秒刷新</span>
+            {config && <span>Signer: {config.signer_mode === "speculos" ? "Ledger (Speculos)" : "Server (fallback)"}</span>}
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />Refreshes every 2 s</span>
           </div>
         </div>
       </header>

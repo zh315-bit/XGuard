@@ -99,4 +99,4 @@ def test_verifier_uses_approved_snapshot(merchant, offline, fake_chain, monkeypa
     view, _ = approve(r.approval_id)
 
     assert view["payment_state"] == sm.RESOURCE_DELIVERED
-    assert len(seen) == 1 and seen[0].startswith(approved_text + "\n验收周期（批准时冻结）")
+    assert len(seen) == 1 and seen[0].startswith(approved_text + "\nAcceptance period (frozen at approval)")

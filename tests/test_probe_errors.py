@@ -23,8 +23,8 @@ def assert_failed_not_paid(r, merchant, offline, *needles):
 
 @pytest.mark.parametrize("code, needles", [
     (404, ("HTTP 404", "Not Found")),
-    (500, ("HTTP 500", "商户端错误")),
-    (302, ("HTTP 302", "不自动跟随", "elsewhere.example")),
+    (500, ("HTTP 500", "merchant-side error")),
+    (302, ("HTTP 302", "not followed", "elsewhere.example")),
 ], ids=["404", "500", "302"])
 def test_http_errors(merchant, offline, code, needles):
     r = fetch(merchant, f"/status/{code}")
@@ -38,13 +38,13 @@ def test_connection_failure(merchant, offline):
     merchant_base, merchant.base = merchant.base, f"http://127.0.0.1:{port}"
     r = fetch(merchant, "/data")
     merchant.base = merchant_base
-    assert_failed_not_paid(r, merchant, offline, "连接资源失败")
+    assert_failed_not_paid(r, merchant, offline, "Could not connect")
 
 
 def test_timeout(merchant, offline, monkeypatch):
     monkeypatch.setattr(x402_gate, "PROBE_TIMEOUT", 0.3)
     r = fetch(merchant, "/slow")
-    assert_failed_not_paid(r, merchant, offline, "超时")
+    assert_failed_not_paid(r, merchant, offline, "timed out")
 
 
 def test_2xx_is_free(merchant, offline):

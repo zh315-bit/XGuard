@@ -21,11 +21,11 @@ from guard.db import connect
 
 # yaml 键 → 给人看的名字和说明
 FIELDS: dict[str, tuple[str, str]] = {
-    "auto_limit_xrp": ("单笔自动付款上限", "不超过这个金额、且其他检查都通过的付款，由热钱包自动支付"),
-    "daily_budget_xrp": ("每日自动付款预算", "当天自动付款累计超过它，之后的付款都要人工确认"),
-    "daily_total_cap_xrp": ("每日总支出上限", "自动付款加人工批准的总和；人工批准也不能突破"),
-    "hard_cap_xrp": ("单笔硬上限", "超过这个金额的付款直接拒绝，人工也不能批准"),
-    "escrow_threshold_xrp": ("验货托管门槛", "超过这个金额、且商户支持时，先把钱锁进托管，验货通过才付给商户"),
+    "auto_limit_xrp": ("Per-payment auto limit", "Payments up to this amount that pass every other check are paid automatically from the hot wallet"),
+    "daily_budget_xrp": ("Daily auto budget", "Once automatic payments today exceed it, further payments need human approval"),
+    "daily_total_cap_xrp": ("Daily total cap", "Automatic plus human-approved payments; cannot be exceeded even with approval"),
+    "hard_cap_xrp": ("Per-payment hard cap", "Payments above this amount are denied outright; humans cannot approve them"),
+    "escrow_threshold_xrp": ("Escrow threshold", "Above this amount, if the merchant supports it, funds go into escrow and are released only after verification"),
 }
 
 DEFAULTS = {"escrow_threshold_xrp": 5}   # 与 policy.load_policy 的默认值一致：文件里可以没有这一行
@@ -54,7 +54,7 @@ def update(changes: dict[str, Any], source: str = "console") -> dict[str, Any]:
     """校验全部改动（含字段之间的关系），通过后原子写回 policy.yaml 并记审计；任何一项不合法都不写。"""
     unknown = sorted(set(changes) - set(FIELDS))
     if unknown:
-        raise PolicyValidationError([f"不能通过控制台修改 {k}" for k in unknown])
+        raise PolicyValidationError([f"{k} cannot be changed from the console" for k in unknown])
     with _lock:
         path = policy_path()
         text = path.read_text()
@@ -97,16 +97,16 @@ def _parse(key: str, value: Any, errors: list[str]) -> Optional[Decimal]:
     try:
         d = Decimal(str(value).strip())
     except InvalidOperation:
-        errors.append(f"{label}：“{value}”不是数字")
+        errors.append(f"{label}: “{value}” is not a number")
         return None
     if not d.is_finite():
-        errors.append(f"{label}：必须是有限的数字")
+        errors.append(f"{label}: must be a finite number")
     elif d < 0:
-        errors.append(f"{label}：不能为负数")
+        errors.append(f"{label}: cannot be negative")
     elif d * policy.DROPS_PER_XRP != (d * policy.DROPS_PER_XRP).to_integral_value():
-        errors.append(f"{label}：最多 6 位小数（1 drop = 0.000001 XRP）")
+        errors.append(f"{label}: at most 6 decimal places (1 drop = 0.000001 XRP)")
     elif d > 100_000_000_000:
-        errors.append(f"{label}：超过 XRP 总量")
+        errors.append(f"{label}: exceeds the total XRP supply")
     else:
         return d
     return None
@@ -115,11 +115,11 @@ def _parse(key: str, value: Any, errors: list[str]) -> Optional[Decimal]:
 def _relations(v: dict[str, Decimal]) -> list[str]:
     errors = []
     if v["hard_cap_xrp"] <= v["auto_limit_xrp"]:
-        errors.append(f"单笔硬上限（{_fmt(v['hard_cap_xrp'])}）必须大于单笔自动付款上限（{_fmt(v['auto_limit_xrp'])}）")
+        errors.append(f"Per-payment hard cap ({_fmt(v['hard_cap_xrp'])}) must be greater than the per-payment auto limit ({_fmt(v['auto_limit_xrp'])})")
     if v["daily_total_cap_xrp"] < v["daily_budget_xrp"]:
-        errors.append(f"每日总支出上限（{_fmt(v['daily_total_cap_xrp'])}）不能小于每日自动付款预算（{_fmt(v['daily_budget_xrp'])}）")
+        errors.append(f"Daily total cap ({_fmt(v['daily_total_cap_xrp'])}) cannot be less than the daily auto budget ({_fmt(v['daily_budget_xrp'])})")
     if v["escrow_threshold_xrp"] >= v["hard_cap_xrp"]:
-        errors.append(f"验货托管门槛（{_fmt(v['escrow_threshold_xrp'])}）必须小于单笔硬上限（{_fmt(v['hard_cap_xrp'])}），否则永远不会走托管")
+        errors.append(f"Escrow threshold ({_fmt(v['escrow_threshold_xrp'])}) must be less than the per-payment hard cap ({_fmt(v['hard_cap_xrp'])}), otherwise escrow is never used")
     return errors
 
 

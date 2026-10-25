@@ -103,7 +103,7 @@ def test_llm_unavailable_releases_with_note(merchant, offline, fake_chain, monke
     r, view, _ = buy_e(merchant)
 
     verification = view["escrow"]["verification"]
-    assert verification["verdict"] == "pass" and "语义检查未完成" in verification["reason"]
+    assert verification["verdict"] == "pass" and "semantic check not completed" in verification["reason"]
     assert verification["semantic_check"] == "incomplete"
     assert all(c["ok"] for c in verification["checks"])
     assert view["payment_state"] == sm.RESOURCE_DELIVERED and len(fake_chain.of_type("EscrowFinish")) == 1
@@ -170,7 +170,7 @@ def test_agent_view_for_rejected_delivery(merchant, offline, fake_chain, monkeyp
 
     agent_view = views.approval_for_agent(approval_service.view(r.approval_id))
 
-    assert agent_view["status"] == "delivery_rejected" and "验货不通过" in agent_view["reason"]
+    assert agent_view["status"] == "delivery_rejected" and "Verification failed" in agent_view["reason"]
     assert "content" not in agent_view                                 # 垃圾数据不交给 agent
     assert agent_view["escrow"]["verification"] == "fail"
 
@@ -223,7 +223,7 @@ def test_topup_needs_approval_and_rechecks_cap(fake_chain, monkeypatch):
     treasury = CountingSigner()
     view = asyncio.run(approval_service.approve(created["approval_id"], treasury))
 
-    assert view["payment_state"] == sm.FAILED and "上限" in view["reject_reason"]
+    assert view["payment_state"] == sm.FAILED and "above the cap" in view["reject_reason"]
     assert treasury.calls == 0 and fake_chain.submitted == []
 
 

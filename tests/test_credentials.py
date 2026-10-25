@@ -89,4 +89,4 @@ def test_lookup_failure_makes_gate_hold_not_auto(use_client):
     decision = evaluation.decide(quote)
 
     assert (decision.verdict, decision.rule_id) == ("HOLD", "R3")
-    assert "无法查询" in decision.reason
+    assert "Could not look up" in decision.reason

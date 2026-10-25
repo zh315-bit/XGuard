@@ -118,12 +118,12 @@ def execute(payment_id: int, signer: Signer, memo: dict[str, Any]) -> dict:
     try:
         fresh = reprobe(row["url"], ESCROW_SCHEME, buyer=row["agent_id"])
     except (requests.RequestException, ValueError) as exc:
-        return _fail_before_submit(row, f"锁款前重新获取报价失败：{exc}")
+        return _fail_before_submit(row, f"Re-fetching the quote before locking failed: {exc}")
     if fresh.terms_hash() != row["quote_hash"]:
         return _deny(row, _swap_decision(row, fresh), fresh)
     recheck = evaluation.decide(fresh)
     if recheck.verdict == DENY:
-        return _deny(row, Decision(DENY, recheck.rule_id, f"锁款前重新判定为拒绝：{recheck.reason}"), fresh)
+        return _deny(row, Decision(DENY, recheck.rule_id, f"Re-evaluated as denied before locking: {recheck.reason}"), fresh)
 
     cfg = policy.load_policy()
     preimage, condition = new_condition()
@@ -145,7 +145,7 @@ def execute(payment_id: int, signer: Signer, memo: dict[str, Any]) -> dict:
     except Exception as exc:  # noqa: BLE001 —— 还没发出任何交易
         if get(payment_id):
             update(payment_id, status="failed")      # 卡片状态与支付状态一致：没锁款、没动钱
-        return _fail_before_submit(row, f"锁款未执行：{exc}")
+        return _fail_before_submit(row, f"Lock not executed: {exc}")
 
     tx_hash = Transaction.from_blob(blob).get_hash()
     sm.advance(payment_id, sm.SUBMITTED, tx_hash=tx_hash, last_ledger_sequence=tx.last_ledger_sequence,
@@ -156,7 +156,7 @@ def execute(payment_id: int, signer: Signer, memo: dict[str, Any]) -> dict:
     except chain.SubmitUnknown as exc:
         return _unknown(payment_id, str(exc))
     if chain.result_code(result) != "tesSUCCESS":
-        return _unknown(payment_id, f"EscrowCreate 结果 {chain.result_code(result)}")
+        return _unknown(payment_id, f"EscrowCreate result {chain.result_code(result)}")
     mark_locked(payment_id)
     return deliver_and_verify(payment_id)
 
@@ -183,9 +183,9 @@ def deliver_and_verify(payment_id: int) -> dict:
         resp = requests.get(row["url"], headers=headers, timeout=DELIVERY_TIMEOUT)
         delivery = resp.json() if resp.status_code == 200 else None
     except (requests.RequestException, ValueError) as exc:
-        return to_refund(payment_id, f"商户没有交付：{exc}")
+        return to_refund(payment_id, f"The merchant did not deliver: {exc}")
     if delivery is None:
-        return to_refund(payment_id, f"商户没有交付：HTTP {resp.status_code} {resp.text[:200]}")
+        return to_refund(payment_id, f"The merchant did not deliver: HTTP {resp.status_code} {resp.text[:200]}")
 
     delivery_text = json.dumps(delivery, ensure_ascii=False)
     sm.advance(payment_id, sm.DELIVERY_RECEIVED, result_json=delivery_text)
@@ -197,7 +197,7 @@ def deliver_and_verify(payment_id: int) -> dict:
            verification_hash=delivery_verifier.verification_hash(verification))
     if verification["verdict"] == delivery_verifier.PASS:
         return release(payment_id)
-    return to_refund(payment_id, f"验货不通过：{verification['reason']}")
+    return to_refund(payment_id, f"Verification failed: {verification['reason']}")
 
 
 # ---- 4a. 放款 ----
@@ -215,11 +215,11 @@ def release(payment_id: int) -> dict:
         result = chain.submit_with_wallet(tx, wallet)
     except Exception as exc:  # noqa: BLE001
         update(payment_id, status="delivered")
-        payments.set_error(payment_id, f"放款提交失败，将重试：{exc}")
+        payments.set_error(payment_id, f"Submitting the release failed, will retry: {exc}")
         return payments.get(payment_id)
     if chain.result_code(result) != "tesSUCCESS":
         update(payment_id, status="delivered")
-        payments.set_error(payment_id, f"放款失败（{chain.result_code(result)}），将重试")
+        payments.set_error(payment_id, f"Release failed ({chain.result_code(result)}), will retry")
         return payments.get(payment_id)
 
     update(payment_id, status="released", finish_tx=result["hash"])
@@ -243,7 +243,7 @@ def refund(payment_id: int) -> dict:
     record = get(payment_id)
     now = chain.ledger_close_time()
     if now <= record["cancel_after"]:
-        raise TooEarlyToCancel(f"还没到 CancelAfter：还差 {record['cancel_after'] - now} 秒")
+        raise TooEarlyToCancel(f"CancelAfter not reached yet: {record['cancel_after'] - now} s to go")
     if not claim(payment_id, "refund_pending", "refunding"):
         return payments.get(payment_id)
     wallet = load_wallet("agent")
@@ -256,7 +256,7 @@ def refund(payment_id: int) -> dict:
         code, result = f"error: {exc}", {}
     if code != "tesSUCCESS":
         update(payment_id, status="refund_pending")
-        payments.set_error(payment_id, f"{payments.get(payment_id).get('error')}；退款提交失败（{code}），将重试")
+        payments.set_error(payment_id, f"{payments.get(payment_id).get('error')}; submitting the refund failed ({code}), will retry")
         return payments.get(payment_id)
 
     update(payment_id, status="refunded", cancel_tx=result["hash"])

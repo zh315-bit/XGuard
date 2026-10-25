@@ -46,14 +46,14 @@ def test_update_writes_back_and_keeps_comments(policy_file, client):
 
 
 @pytest.mark.parametrize("changes, message", [
-    ({"auto_limit_xrp": "-1"}, "不能为负数"),
-    ({"auto_limit_xrp": "abc"}, "不是数字"),
-    ({"auto_limit_xrp": "0.0000001"}, "6 位小数"),
-    ({"auto_limit_xrp": "NaN"}, "有限"),
-    ({"hard_cap_xrp": "1"}, "必须大于单笔自动付款上限"),
-    ({"daily_total_cap_xrp": "4"}, "不能小于每日自动付款预算"),
-    ({"escrow_threshold_xrp": "50"}, "必须小于单笔硬上限"),
-    ({"network": "xrpl:0"}, "不能通过控制台修改"),
+    ({"auto_limit_xrp": "-1"}, "cannot be negative"),
+    ({"auto_limit_xrp": "abc"}, "is not a number"),
+    ({"auto_limit_xrp": "0.0000001"}, "6 decimal places"),
+    ({"auto_limit_xrp": "NaN"}, "finite"),
+    ({"hard_cap_xrp": "1"}, "must be greater than the per-payment auto limit"),
+    ({"daily_total_cap_xrp": "4"}, "cannot be less than the daily auto budget"),
+    ({"escrow_threshold_xrp": "50"}, "must be less than the per-payment hard cap"),
+    ({"network": "xrpl:0"}, "cannot be changed from the console"),
 ])
 def test_invalid_changes_rejected_and_nothing_written(policy_file, client, changes, message):
     before = policy_file.read_text()

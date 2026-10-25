@@ -35,20 +35,21 @@ _ALLOWED_KEYS = ("ANTHROPIC_API_KEY", "AGENT_MODEL_PROVIDER", "AGENT_MODEL_ID",
 _file = dotenv_values(ROOT / ".env")
 CONFIG = {k: os.getenv(k) or _file.get(k) for k in _ALLOWED_KEYS}
 
-SYSTEM_PROMPT = """你是一个研究 agent，帮用户完成数据研究任务（例如撰写 XRPL 生态周报）。
-你没有钱包和私钥，所有付费数据只能通过 AgentGuard 的 fetch_paid_resource 工具购买。
-不知道去哪买数据时，先用 list_data_sources 查看可购买的数据目录（URL、描述、参考价格），自己决定买哪些。
-花钱要克制：只买完成任务真正需要的数据，不要重复购买同一份数据。
-每次购买都要给一个唯一的 request_id（例如 weekly-report-data-a）；重试同一次购买必须复用同一个 request_id。
-根据返回的 status 处理：
-- paid：数据已到手，直接使用。
-- pending_approval：需要人工审批。把 reason、risk_summary 和 approver_command 告诉用户（审批单约 2 分钟内有效），
-  然后调用 wait_for_approval 等待（timeout_s 用 150）。不要重复调用 fetch_paid_resource。
-  仍是 pending 就再等一次；approved 就使用 content；rejected 或 expired 就说明原因并跳过这份数据。
-- denied：守卫拒绝付款。不要重试同一个 URL；向用户说明被拒的原因（引用守卫给的 reason），然后跳过这份数据。
-- delivery_rejected / refunded：escrow 验货不通过，钱不会付给商户（到期退回金库）。引用 reason 向用户说明，换别的数据源。
-- settlement_unknown：付款结果未知。不要换 request_id 重买，用同一个 request_id 再查一次，仍未知就如实告诉用户。
-最后基于实际拿到的数据给出结果（周报或研究结论），并列出每份数据的来源、付款结果和交易哈希；没拿到的数据要注明原因，不要编造。"""
+SYSTEM_PROMPT = """You are a research agent that helps the user with data research tasks (for example, writing an XRPL ecosystem weekly report).
+You have no wallet and no private keys; paid data can only be bought through AgentGuard's fetch_paid_resource tool.
+If you do not know where to buy data, call list_data_sources first to see the catalog (URL, description, reference price) and decide what to buy.
+Spend carefully: buy only the data the task really needs and never buy the same dataset twice.
+Give every purchase a unique request_id (e.g. weekly-report-data-a); retries of the same purchase must reuse the same request_id.
+Handle the returned status:
+- paid: the data is in hand; use it.
+- pending_approval: human approval is needed. Tell the user the reason, risk_summary and approver_command (the approval is valid for about 2 minutes),
+  then call wait_for_approval to wait (timeout_s 150). Do not call fetch_paid_resource again.
+  If it is still pending, wait once more; if approved, use the content; if rejected or expired, explain why and skip this dataset.
+- denied: the guard refused to pay. Do not retry the same URL; tell the user why (quote the guard's reason) and skip this dataset.
+- delivery_rejected / refunded: escrow verification failed and the merchant is not paid (funds return to the treasury). Quote the reason to the user and use another source.
+- fetch_failed: fetching the resource failed and nothing was paid; error is the reason, not data.
+- settlement_unknown: the payment outcome is unknown. Do not buy again with a new request_id; check once more with the same request_id and, if still unknown, tell the user honestly.
+Finally, give the result (report or research conclusion) based only on the data you actually received, listing each dataset's source, payment outcome and transaction hash; for data you did not get, state why. Do not make anything up. Write in English."""
 
 
 def task_prompt() -> str:
@@ -128,7 +129,7 @@ def build_model():
     if provider == "anthropic":
         from strands.models.anthropic import AnthropicModel
         if not CONFIG["ANTHROPIC_API_KEY"]:
-            sys.exit("缺少 ANTHROPIC_API_KEY：写进 .env 或 export 后再运行")
+            sys.exit("Missing ANTHROPIC_API_KEY: put it in .env or export it, then run again")
         return AnthropicModel(
             # 重试交给 TransientLLMRetry 统一控制（流式中途断开也能重试），SDK 自己不再重试
             client_args={"api_key": CONFIG["ANTHROPIC_API_KEY"], "timeout": LLM_TIMEOUT_SECONDS, "max_retries": 0},
@@ -142,7 +143,7 @@ def build_model():
             model_id=CONFIG["BEDROCK_MODEL_ID"] or "anthropic.claude-opus-5-5",
             region_name=CONFIG["AWS_REGION"] or "us-east-1",
         )
-    sys.exit(f"不支持的 AGENT_MODEL_PROVIDER：{provider}（可选 anthropic / bedrock）")
+    sys.exit(f"Unsupported AGENT_MODEL_PROVIDER: {provider} (anthropic / bedrock)")
 
 
 def guard_mcp_client(agent_id: Optional[str] = None) -> MCPClient:
@@ -241,11 +242,11 @@ class MissionReporter(HookProvider):
             if name not in ("fetch_paid_resource", "wait_for_approval"):
                 continue
             p = payload if isinstance(payload, dict) else {}
-            what = args.get("url") or f"审批单 #{args.get('approval_id')}"
-            status = p.get("status") or ("出错" if "error" in p else "—")
-            extra = p.get("reason") or (f"交易 {p['tx_hash'][:12]}…" if p.get("tx_hash") else "")
-            lines.append(f"- `{what}`：{status}{('，' + str(extra)[:160]) if extra else ''}")
-        return "\n".join(lines) or "- 还没有完成任何购买"
+            what = args.get("url") or f"approval #{args.get('approval_id')}"
+            status = p.get("status") or ("error" if "error" in p else "—")
+            extra = p.get("reason") or (f"tx {p['tx_hash'][:12]}…" if p.get("tx_hash") else "")
+            lines.append(f"- `{what}`: {status}{(', ' + str(extra)[:160]) if extra else ''}")
+        return "\n".join(lines) or "- No purchases completed yet"
 
     def _post(self, path: str, **body: Any) -> None:
         if self.mission_id is None:
@@ -289,9 +290,9 @@ def main() -> None:
                 raise
             # LLM 重试后仍不可用：结束任务，不无限等待；付款状态以守卫记录为准
             reporter.llm_status(False, kind, str(exc))
-            reporter.finish("llm_unavailable", f"**LLM 不可用，任务中止**（{kind}：{str(exc)[:200]}）\n\n"
-                                               f"已完成的步骤：\n{reporter.progress_summary()}")
-            print(f"\nLLM 不可用，任务中止：{kind}：{exc}", file=sys.stderr)
+            reporter.finish("llm_unavailable", f"**LLM unavailable, mission aborted** ({kind}: {str(exc)[:200]})\n\n"
+                                               f"Completed steps:\n{reporter.progress_summary()}")
+            print(f"\nLLM unavailable, mission aborted: {kind}: {exc}", file=sys.stderr)
             sys.exit(2)
         reporter.llm_status(True)
         # 最后一段助手文字就是周报

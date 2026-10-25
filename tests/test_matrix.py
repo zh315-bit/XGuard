@@ -156,7 +156,7 @@ def test_T06c_manual_approval_cannot_exceed_daily_total_cap(merchant, offline, t
 
     view = approve(second.approval_id, treasury)   # 8 + 8 > 10
 
-    assert view["status"] == "rejected" and "每日总上限" in view["reject_reason"]
+    assert view["status"] == "rejected" and "daily total cap" in view["reject_reason"]
     assert treasury.calls == 1 and len(merchant.payment_headers) == 1
 
 
@@ -240,7 +240,7 @@ def test_T09_quote_replaced_during_approval(merchant, offline):
 
     view = approve(r.approval_id, treasury)
 
-    assert view["status"] == "rejected" and "调包" in view["reject_reason"]
+    assert view["status"] == "rejected" and "swapped" in view["reject_reason"]
     row = payments.get(r.payment_id)
     assert (row["state"], row["rule_id"]) == (sm.DENIED, "R8")
     assert budget.get(r.payment_id)["status"] == "released"
@@ -327,7 +327,7 @@ def test_T11c_chain_lookup_error_keeps_unknown(merchant, offline, chain, short_p
     merchant.pay_mode = "hang"
     monkeypatch.setattr(settlement, "lookup_tx", lambda h: (_ for _ in ()).throw(ConnectionError("rpc down")))
     r = fetch(merchant)
-    assert r.state == sm.UNKNOWN_SETTLEMENT and "对账查询失败" in r.error
+    assert r.state == sm.UNKNOWN_SETTLEMENT and "reconciliation lookup failed" in r.error
 
 
 # ---- T12 LLM 不可用时策略和模板解释正常 ----

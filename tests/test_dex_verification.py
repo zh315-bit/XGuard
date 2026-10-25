@@ -45,7 +45,7 @@ def test_coverage_is_previous_full_iso_week():
 def test_normal_passes():
     assert failed(normal()) == []
     out = delivery_verifier.verify(escrow_merchant.DESCRIPTION, SCHEMA, normal())
-    assert out["verdict"] == "pass" and "语义检查未完成" in out["reason"]
+    assert out["verdict"] == "pass" and "semantic check not completed" in out["reason"]
 
 
 def test_garbage_2019_rejected_without_llm(no_llm):

@@ -2,7 +2,7 @@
 export function DemoDeviceNotice() {
   return (
     <div className="mt-3 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
-      ⚠ Speculos 模拟器，私钥在本机，仅用于演示
+      ⚠ Speculos emulator: the private key is on this machine, demo only
     </div>
   );
 }

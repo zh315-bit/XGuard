@@ -17,7 +17,7 @@ export function Mission() {
     return (
       <Layout error={error} left={<>{launcher}<SpendReport /></>}>
         <Card className="flex h-full min-h-[420px] items-center justify-center">
-          <Empty>还没有任务。在左边输入任务并点“运行”，或用命令行 <code className="text-slate-300">scripts/demo_run.py</code></Empty>
+          <Empty>No missions yet. Enter a task on the left and click “Run”, or use <code className="text-slate-300">scripts/demo_run.py</code></Empty>
         </Card>
       </Layout>
     );
@@ -32,23 +32,23 @@ export function Mission() {
       <>
         {launcher}
         <SpendReport />
-        <Card title={`任务 #${data.id}`} right={<MissionStatus status={data.status} />}>
+        <Card title={`Mission #${data.id}`} right={<MissionStatus status={data.status} />}>
           <p className="max-h-48 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-slate-200">{data.task}</p>
-          <p className="mt-2 text-xs text-slate-500">开始于 {timeAgo(data.created_at)} · agent 没有私钥，只能通过 AgentGuard 的 MCP 工具花钱</p>
+          <p className="mt-2 text-xs text-slate-500">Started {timeAgo(data.created_at)} · the agent holds no keys and can only spend through AgentGuard's MCP tools</p>
         </Card>
       </>
     }>
       {data.status === "llm_unavailable" && (
         <div className="rounded-xl border border-rose-500/60 bg-rose-500/10 px-5 py-4">
-          <div className="text-lg font-bold text-rose-200">⚠ LLM 不可用，任务中止</div>
+          <div className="text-lg font-bold text-rose-200">⚠ LLM unavailable, mission aborted</div>
           <p className="mt-1 text-sm text-rose-100/80">
-            Anthropic API 重试后仍然失败，agent 已结束任务，不会再继续等待。已经发生的付款以守卫记录为准，下方是已完成步骤的摘要。
+            The Anthropic API still failed after retries, so the agent ended the mission instead of waiting. The guard's records are authoritative for any payments already made; a summary of completed steps is below.
           </p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
-        <Card title="每一步">
-          {steps.length === 0 ? <Empty>等待 agent 的第一步…</Empty> : (
+        <Card title="Steps">
+          {steps.length === 0 ? <Empty>Waiting for the agent's first step…</Empty> : (
             <ol className="space-y-3">
               {steps.map((e) => <Step key={e.id} event={e} />)}
             </ol>
@@ -56,8 +56,8 @@ export function Mission() {
         </Card>
 
         <div className="space-y-6">
-          <Card title="购买的数据源">
-            {purchases.length === 0 ? <Empty>还没有购买</Empty> : (
+          <Card title="Purchased data sources">
+            {purchases.length === 0 ? <Empty>Nothing purchased yet</Empty> : (
               <table className="w-full text-sm">
                 <tbody>
                   {purchases.map((e) => {
@@ -78,17 +78,17 @@ export function Mission() {
           </Card>
 
           {missionEscrows.length > 0 && (
-            <Card title="先验货再放款（Escrow）">
+            <Card title="Verify before release (escrow)">
               <div className="space-y-4">
                 {missionEscrows.map((e) => <EscrowTimeline key={e.id} escrow={e} />)}
               </div>
             </Card>
           )}
 
-          <Card title={data.status === "llm_unavailable" ? "已完成的步骤" : "最终周报"}>
+          <Card title={data.status === "llm_unavailable" ? "Completed steps" : "Final report"}>
             {data.report ? (
               <Markdown>{data.report}</Markdown>
-            ) : <Empty>{data.status === "running" ? "agent 还在工作…" : "没有生成周报"}</Empty>}
+            ) : <Empty>{data.status === "running" ? "The agent is still working…" : "No report was produced"}</Empty>}
           </Card>
         </div>
       </div>
@@ -134,7 +134,7 @@ function Step({ event: e }: { event: MissionEvent }) {
   if (e.kind === "tool_call") {
     return (
       <li className="rounded-lg border border-slate-800 px-3 py-2">
-        <div className="text-xs text-slate-500">调用工具</div>
+        <div className="text-xs text-slate-500">Tool call</div>
         <div className="font-mono text-sm text-sky-300">{e.name}</div>
         <pre className="mt-1 whitespace-pre-wrap break-all text-xs text-slate-400">{JSON.stringify(e.payload, null, 1)}</pre>
       </li>
@@ -144,11 +144,11 @@ function Step({ event: e }: { event: MissionEvent }) {
   return (
     <li className="ml-4 rounded-lg border-l-2 border-slate-700 bg-slate-950/40 px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-slate-500">结果</span>
+        <span className="text-xs text-slate-500">Result</span>
         {r.verdict && <VerdictBadge verdict={r.verdict} />}
         <RuleText rule={r.rule_id} />
         {r.status && <span className="text-xs text-slate-300">{r.status}</span>}
-        {r.approval_id && <span className="text-xs text-amber-300">审批单 #{r.approval_id}</span>}
+        {r.approval_id && <span className="text-xs text-amber-300">Approval #{r.approval_id}</span>}
         <TxLink hash={r.tx_hash} url={r.explorer_url} />
       </div>
       {r.reason && <p className="mt-1 text-xs text-slate-400">{r.reason}</p>}
@@ -181,7 +181,7 @@ function AgentText({ text }: { text: string }) {
       </div>
       {long && (
         <button onClick={() => setOpen(!open)} className="mt-2 text-xs text-sky-400 hover:underline">
-          {open ? "收起" : "展开全文"}
+          {open ? "Collapse" : "Show all"}
         </button>
       )}
     </li>
@@ -190,6 +190,6 @@ function AgentText({ text }: { text: string }) {
 
 function MissionStatus({ status }: { status: string }) {
   const style = { running: "text-sky-300", done: "text-emerald-300", failed: "text-rose-300", cancelled: "text-slate-400", llm_unavailable: "text-rose-300" }[status] ?? "text-slate-400";
-  const text = { running: "进行中", done: "已完成", failed: "失败", cancelled: "已取消", llm_unavailable: "LLM 不可用，已中止" }[status] ?? status;
+  const text = { running: "Running", done: "Done", failed: "Failed", cancelled: "Cancelled", llm_unavailable: "LLM unavailable, aborted" }[status] ?? status;
   return <span className={`text-xs font-semibold ${style}`}>{status === "running" ? "● " : ""}{text}</span>;
 }

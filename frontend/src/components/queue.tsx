@@ -24,28 +24,28 @@ export function flowSteps(f: Flow, details: Partial<Record<string, ReactNode>> =
   const topup = f.method === "topup";
   if (f.rule_id === "PROBE") {
     return [
-      { id: "request", label: "发起请求", status: "done" },
-      { id: "probe", label: "请求资源失败，没有付款", status: "failed" },
+      { id: "request", label: "Request", status: "done" },
+      { id: "probe", label: "Fetching the resource failed; nothing paid", status: "failed" },
     ];
   }
   if (f.verdict === "FREE" || (f.state === "RESOURCE_DELIVERED" && !f.hasQuote)) {
     return [
-      { id: "request", label: "发起请求", status: "done" },
-      { id: "deliver", label: "免费资源，直接拿到数据", status: "done" },
+      { id: "request", label: "Request", status: "done" },
+      { id: "deliver", label: "Free resource, data received", status: "done" },
     ];
   }
   const hold = f.verdict === "HOLD" || topup;
   const refunded = f.state === "REFUND_PENDING" || f.state === "REFUNDED";
   const labels: Record<string, string> = {
-    quote: topup ? "发起补款" : "拿到报价",
-    evaluate: "策略判定",
-    approval: "人工审批",
-    sign: hold ? "Ledger 设备签名" : "热钱包自动签名",
-    chain: "上链确认",
-    deliver: topup ? "补款到账" : "付款完成，拿到数据",
-    lock: "锁款上链（EscrowCreate）",
-    verify: "收货并验货",
-    release: f.state === "REFUNDED" ? "验货不合格，已退回金库" : refunded ? "验货不合格，等待退款" : "验货通过，放款给商户",
+    quote: topup ? "Top-up requested" : "Quote received",
+    evaluate: "Policy check",
+    approval: "Human approval",
+    sign: hold ? "Ledger signature" : "Hot wallet auto-sign",
+    chain: "On-chain confirmation",
+    deliver: topup ? "Top-up received" : "Paid, data received",
+    lock: "Lock on chain (EscrowCreate)",
+    verify: "Receive and verify",
+    release: f.state === "REFUNDED" ? "Verification failed, refunded to treasury" : refunded ? "Verification failed, refund pending" : "Verified, released to merchant",
   };
   const ids = ["quote", "evaluate", ...(hold ? ["approval"] : []), "sign",
                ...(escrow ? ["lock", "verify", "release"] : ["chain", "deliver"])];
@@ -181,7 +181,7 @@ export function groupByDay<T>(items: T[], ts: (item: T) => number): { label: str
     const d = new Date(ts(item) * 1000);
     d.setHours(0, 0, 0, 0);
     const days = Math.round((today.getTime() - d.getTime()) / 86_400_000);
-    const label = days === 0 ? "今天" : days === 1 ? "昨天" : `${d.getMonth() + 1}月${d.getDate()}日`;
+    const label = days === 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const last = groups[groups.length - 1];
     if (last?.label === label) last.items.push(item);
     else groups.push({ label, items: [item] });
@@ -226,7 +226,7 @@ export function DetailLayout({ steps, children }: { steps: Step[]; children: Rea
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
       <div className="min-w-0 space-y-4">{children}</div>
       <div className="lg:border-l lg:border-slate-800 lg:pl-6">
-        <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-500">处理进度</h4>
+        <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-slate-500">Progress</h4>
         <StepTimeline steps={steps} />
       </div>
     </div>
@@ -272,7 +272,7 @@ const TONE: Record<string, string> = {
 /** 行首的类型图标：普通付款 / 托管锁款 / 金库补款 / 拒绝。颜色跟判定结果走。 */
 export function MethodIcon({ method, verdict }: { method?: string; verdict?: string }) {
   const d = verdict === "DENY" ? ICONS.deny : method === "escrow" ? ICONS.lock : method === "topup" ? ICONS.topup : ICONS.send;
-  const title = verdict === "DENY" ? "已拒绝" : method === "escrow" ? "托管付款（先验货再放款）" : method === "topup" ? "金库给热钱包补款" : "x402 付款";
+  const title = verdict === "DENY" ? "Denied" : method === "escrow" ? "Escrow payment (verify before release)" : method === "topup" ? "Treasury → hot wallet top-up" : "x402 payment";
   return (
     <span title={title} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-inset ${TONE[verdict ?? ""] ?? "bg-slate-800 text-slate-300 ring-slate-700"}`}>
       <Icon d={d} />
@@ -281,7 +281,7 @@ export function MethodIcon({ method, verdict }: { method?: string; verdict?: str
 }
 
 export function methodLabel(method?: string) {
-  return method === "escrow" ? "托管付款" : method === "topup" ? "金库补款" : "x402 付款";
+  return method === "escrow" ? "Escrow payment" : method === "topup" ? "Treasury top-up" : "x402 payment";
 }
 
 /** 资源 URL 的简短显示：http 取路径，其余（如 xrpl://treasury/...）原样。 */

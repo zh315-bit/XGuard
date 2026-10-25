@@ -65,10 +65,10 @@ def submit(approval: dict, signed_blob: str) -> dict:
     """校验并接受签好的 blob。校验失败抛 SignatureRejected，并把签名请求标为 rejected。"""
     req = for_approval(approval["id"])
     if req is None or req["status"] != PENDING:
-        raise SignatureRejected(f"审批单 #{approval['id']} 没有等待中的签名请求")
+        raise SignatureRejected(f"Approval #{approval['id']} has no pending signing request")
     if time.time() > req["expires_at"]:
-        _finish(req["id"], EXPIRED, error="签名请求已过期")
-        raise SignatureRejected("签名请求已过期")
+        _finish(req["id"], EXPIRED, error="The signing request has expired")
+        raise SignatureRejected("The signing request has expired")
     try:
         validate(signed_blob, req, approval)
     except SignatureRejected as exc:
@@ -88,26 +88,26 @@ def validate(signed_blob: str, req: dict, approval: dict) -> None:
     try:
         signed = decode(signed_blob)
     except Exception as exc:  # noqa: BLE001 —— 任何解码失败都是不合法的 blob
-        raise SignatureRejected(f"签名交易无法解码：{exc}") from exc
+        raise SignatureRejected(f"Cannot decode the signed transaction: {exc}") from exc
     unsigned = decode(req["unsigned_hex"])
     quote = json.loads(approval["quote_json"])
 
     if {k: v for k, v in signed.items() if k != "TxnSignature"} != unsigned:
-        raise SignatureRejected("签名交易的内容与后端准备的待签交易不一致")
+        raise SignatureRejected("The signed transaction differs from the one the backend prepared")
     if signed.get("TransactionType") not in ("Payment", "EscrowCreate") or not isinstance(signed.get("Amount"), str):
-        raise SignatureRejected("只接受原生 XRP 的 Payment / EscrowCreate")
+        raise SignatureRejected("Only native-XRP Payment / EscrowCreate is accepted")
     if signed.get("Destination") != quote["payTo"]:
-        raise SignatureRejected(f"收款地址 {signed.get('Destination')} 与审批单 {quote['payTo']} 不一致")
+        raise SignatureRejected(f"Destination {signed.get('Destination')} does not match the approval's {quote['payTo']}")
     if signed["Amount"] != quote["amount"]:
-        raise SignatureRejected(f"金额 {signed['Amount']} drops 与审批单 {quote['amount']} drops 不一致")
+        raise SignatureRejected(f"Amount {signed['Amount']} drops does not match the approval's {quote['amount']} drops")
     if _terms_hash(quote, signed, approval) != approval["quote_hash"]:
-        raise SignatureRejected("按签名交易计算的 quote_hash 与审批单绑定的不一致")
+        raise SignatureRejected("The quote_hash computed from the signed transaction does not match the approval")
     if signed.get("Account") != req["signer_account"] or signed.get("SigningPubKey") != req["signing_pub_key"]:
-        raise SignatureRejected("付款账户或签名公钥不是金库 / 设备")
+        raise SignatureRejected("The paying account or signing key is not the treasury / device")
     signature = signed.get("TxnSignature")
     if not signature or not is_valid_message(bytes.fromhex(encode_for_signing(unsigned)), bytes.fromhex(signature),
                                              req["signing_pub_key"]):
-        raise SignatureRejected("签名验证不通过")
+        raise SignatureRejected("Signature verification failed")
 
 
 def _terms_hash(quote: dict, signed: dict, approval: dict) -> str:

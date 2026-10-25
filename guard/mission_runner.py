@@ -27,7 +27,7 @@ _procs: dict[int, subprocess.Popen] = {}
 
 class MissionBusy(RuntimeError):
     def __init__(self, mission: dict) -> None:
-        super().__init__(f"任务 #{mission['id']} 正在运行，先等它结束或取消它")
+        super().__init__(f"Mission #{mission['id']} is running; wait for it to finish or cancel it")
         self.mission = mission
 
 
@@ -44,7 +44,7 @@ def agent_env(mission_id: int, task: str) -> dict[str, str]:
 def start(task: str) -> int:
     task = task.strip()
     if not task or len(task) > MAX_TASK_CHARS:
-        raise ValueError(f"任务文本长度必须在 1 到 {MAX_TASK_CHARS} 字之间")
+        raise ValueError(f"The task must be between 1 and {MAX_TASK_CHARS} characters")
     with _lock:
         busy = running_mission()
         if busy:
@@ -65,9 +65,9 @@ def start(task: str) -> int:
 def cancel(mission_id: int) -> dict:
     mission = missions.get(mission_id)
     if mission is None or mission["status"] != "running":
-        raise NotRunning(f"任务 #{mission_id} 没有在运行")
+        raise NotRunning(f"Mission #{mission_id} is not running")
     # 先标记为已取消，再结束进程：否则 _watch 线程看到进程被杀（非 0 退出码）会抢先标成 failed
-    missions.finish(mission_id, "cancelled", "任务已在控制台取消")
+    missions.finish(mission_id, "cancelled", "Mission cancelled from the console")
     pid = mission.get("pid")
     if pid and _alive(pid):
         try:
@@ -91,7 +91,7 @@ def running_mission() -> Optional[dict]:
             return mission                       # 刚注册、还没来得及记下 pid
         if pid and _alive(pid):
             return mission
-        missions.finish(mission["id"], "failed", "agent 进程已退出，没有上报结果")
+        missions.finish(mission["id"], "failed", "The agent process exited without reporting a result")
     return None
 
 
@@ -101,7 +101,7 @@ def _watch(mission_id: int, proc: subprocess.Popen, log) -> None:
     _procs.pop(mission_id, None)
     # agent 正常结束时自己会上报 done / failed；这里只兜底它没来得及上报的情况
     missions.finish(mission_id, "failed" if code else "done",
-                    f"agent 进程退出码 {code}，详见 data/logs/mission-{mission_id}.log" if code else None)
+                    f"Agent process exit code {code}; see data/logs/mission-{mission_id}.log" if code else None)
 
 
 def _alive(pid: int) -> bool:

@@ -87,7 +87,7 @@ def advance(payment_id: int, to: str, conn: Optional[sqlite3.Connection] = None,
     sources = [s for s, targets in TRANSITIONS.items() if to in targets]
     unknown = set(fields) - _UPDATABLE
     if unknown:
-        raise ValueError(f"不能通过状态转移修改字段：{unknown}")
+        raise ValueError(f"Fields cannot be changed through a state transition: {unknown}")
     cols = "".join(f", {k} = ?" for k in fields)
     sql = (f"UPDATE payment_requests SET state = ?, updated_at = ?{cols} "
            f"WHERE id = ? AND state IN ({','.join('?' * len(sources))})")
@@ -100,7 +100,7 @@ def advance(payment_id: int, to: str, conn: Optional[sqlite3.Connection] = None,
             rowcount = c.execute(sql, params).rowcount
     if rowcount != 1:
         current = _current_state(payment_id, conn)
-        raise IllegalTransition(f"支付请求 #{payment_id} 不能从 {current} 转到 {to}")
+        raise IllegalTransition(f"Payment request #{payment_id} cannot move from {current} to {to}")
 
 
 def _current_state(payment_id: int, conn: Optional[sqlite3.Connection]) -> Optional[str]:

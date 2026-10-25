@@ -38,8 +38,8 @@ PRICE_DROPS = 6_000_000            # 6 XRP：超过单笔自动上限（审批�
 # escrow 离 CancelAfter 太近就不交货（来不及放款）。CancelAfter 在设备签名之前就写进了交易，
 # 人在设备上核对会吃掉一部分时间，所以演示时（CancelAfter 75 秒）这里不能设得太大
 MIN_SECONDS_BEFORE_CANCEL = 15
-DESCRIPTION = ("XRPL DEX 周成交量：dataSchema.coverage 声明的那一个 ISO 周（周一至周日）7 天，"
-               "每天一个成交量数值（单位 XRP），附 7 天合计")
+DESCRIPTION = ("XRPL DEX weekly volume: the 7 days of the ISO week (Mon-Sun) declared in dataSchema.coverage, "
+               "one volume value per day (in XRP), plus the 7-day total")
 DATASET = "xrpl_weekly_dex_volume"
 DATA_SCHEMA = {
     "profile": "xrpl_dex_7day",          # 验货按这个 profile 做七天 DEX 数据的确定性检查
@@ -81,7 +81,7 @@ def register(app: FastAPI, network: str) -> None:
     @app.post(f"{PATH}/mode")
     def set_mode(body: ModeBody) -> dict:
         if body.mode not in ("normal", "garbage", "malformed"):
-            raise HTTPException(400, "mode 只能是 normal / garbage / malformed")
+            raise HTTPException(400, "mode must be normal / garbage / malformed")
         state["mode"] = body.mode
         return {"mode": body.mode}
 
@@ -128,19 +128,19 @@ def _payment_required(url: str, network: str, pay_to: str) -> dict:
 def _check_escrow(owner: str, sequence: int, pay_to: str) -> str | None:
     """返回问题描述；没问题返回 None。"""
     if (owner, sequence) in _used:
-        return "这个 escrow 已经取过货"
+        return "This escrow has already been used for a delivery"
     resp = get_client().request(LedgerEntry(escrow=Escrow(owner=owner, seq=sequence), ledger_index="validated"))
     if not resp.is_successful():
-        return f"链上查不到 escrow（{resp.result.get('error')}）"
+        return f"Escrow not found on chain ({resp.result.get('error')})"
     node = resp.result["node"]
     if node.get("Destination") != pay_to:
-        return "escrow 的收款人不是本商户"
+        return "The escrow destination is not this merchant"
     if node.get("Amount") != str(PRICE_DROPS):
-        return f"escrow 金额 {node.get('Amount')} drops 不等于报价 {PRICE_DROPS}"
+        return f"Escrow amount {node.get('Amount')} drops does not equal the quote {PRICE_DROPS}"
     if not node.get("Condition"):
-        return "escrow 没有条件"
+        return "The escrow has no condition"
     if "CancelAfter" in node and ripple_time_to_posix(node["CancelAfter"]) - time.time() < MIN_SECONDS_BEFORE_CANCEL:
-        return "escrow 离 CancelAfter 太近，来不及放款"
+        return "The escrow is too close to CancelAfter to be released in time"
     return None
 
 

@@ -37,8 +37,8 @@ def reserve(payment_id: int, amount_drops: int, kind: str, cfg: PolicyConfig, fr
         total = _committed(conn, day)
         if total + amount_drops > cfg.daily_total_cap_drops:
             raise BudgetExceeded(Decision(HOLD, "R5", (
-                f"今日总支出已用/已预留 {fmt_xrp(total)} + 本笔 {fmt_xrp(amount_drops)} "
-                f"超过每日总上限 {fmt_xrp(cfg.daily_total_cap_drops)} XRP")))
+                f"Total spent/reserved today {fmt_xrp(total)} + this payment {fmt_xrp(amount_drops)} "
+                f"exceeds the daily total cap of {fmt_xrp(cfg.daily_total_cap_drops)} XRP")))
         if kind == AUTO_KIND:
             over = auto_budget_decision(_committed(conn, day, AUTO_KIND), amount_drops, cfg)
             if over:

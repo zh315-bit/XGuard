@@ -23,17 +23,17 @@ TOTAL_SECONDS = float(env("LLM_TOTAL_SECONDS", "90"))
 BACKOFF_SECONDS = (1, 2, 4)
 
 KIND_TEXT = {
-    "timeout": "请求超时", "network": "网络连接中断", "rate_limit": "触发速率限制（429）",
-    "overloaded": "Anthropic 服务过载（529）", "server": "Anthropic 服务端错误（5xx）",
-    "auth": "API key 无效或无权限", "quota": "账户额度不足", "bad_request": "请求被拒绝（400）",
-    "too_slow": "生成太慢，超过总时长上限", "refusal": "模型拒答", "not_configured": "未配置 ANTHROPIC_API_KEY", "other": "未知错误",
+    "timeout": "request timed out", "network": "network connection dropped", "rate_limit": "rate limited (429)",
+    "overloaded": "Anthropic overloaded (529)", "server": "Anthropic server error (5xx)",
+    "auth": "invalid API key or no permission", "quota": "insufficient account credit", "bad_request": "request rejected (400)",
+    "too_slow": "generation too slow, over the total time limit", "refusal": "model refused", "not_configured": "ANTHROPIC_API_KEY not configured", "other": "unknown error",
 }
 
 
 class LLMUnavailable(Exception):
     def __init__(self, kind: str, detail: str, attempts: int) -> None:
         self.kind, self.detail, self.attempts = kind, detail, attempts
-        retried = f"，已重试 {attempts - 1} 次" if attempts > 1 else ""
+        retried = f", retried {attempts - 1} time(s)" if attempts > 1 else ""
         super().__init__(f"{KIND_TEXT.get(kind, kind)}{retried}")
 
 
@@ -98,7 +98,7 @@ def _stream_to_message(client: Any, started: float, kwargs: dict[str, Any]) -> A
     with client.beta.messages.stream(**kwargs) as stream:
         for _ in stream:
             if time.monotonic() - started > TOTAL_SECONDS:
-                raise _TooSlow(f"超过 {TOTAL_SECONDS:.0f} 秒仍未生成完")
+                raise _TooSlow(f"still not finished after {TOTAL_SECONDS:.0f} s")
         return stream.get_final_message()
 
 
@@ -156,10 +156,10 @@ def status() -> dict[str, Any]:
     if not p["ok"]:
         reason = p["kind_text"]
     elif failing:
-        reason = f"{_SOURCE_TEXT.get(failing[0]['source'], failing[0]['source'])}最近一次调用失败：{failing[0]['kind_text']}"
+        reason = f"Latest {_SOURCE_TEXT.get(failing[0]['source'], failing[0]['source'])} call failed: {failing[0]['kind_text']}"
     else:
         reason = None
     return {"ok": ok, "reason": reason, "probe": p, "calls": calls}
 
 
-_SOURCE_TEXT = {"risk_explainer": "风险解释", "delivery_verifier": "验货", "agent": "agent "}
+_SOURCE_TEXT = {"risk_explainer": "risk explainer", "delivery_verifier": "delivery verifier", "agent": "agent"}

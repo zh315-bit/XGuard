@@ -46,7 +46,7 @@ def test_settlement_unknown_409_is_never_reported_as_paid(merchant, offline, cha
 
     audit_rows = {d["id"]: d for d in TestClient(api.app).get("/audit").json()}
     payer = audit_rows[r.decision_id]["payer"]
-    assert payer == ("金库（Ledger 签名）" if approved else "热钱包")
+    assert payer == ("Treasury (Ledger-signed)" if approved else "Hot wallet")
     assert audit_rows[r.decision_id]["status"] == ("approved_paid" if approved else "paid")
 
 

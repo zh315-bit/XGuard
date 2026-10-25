@@ -65,11 +65,11 @@ def fetch_paid(url: str, purpose: str, max_price_xrp: Optional[Decimal] = None, 
         probe = requests.get(url, headers=payment_executor.buyer_headers(agent_id), timeout=PROBE_TIMEOUT,
                              allow_redirects=False)
     except requests.Timeout:
-        return _probe_failed(pid, url, purpose, f"请求资源超时（{PROBE_TIMEOUT} 秒无响应）")
+        return _probe_failed(pid, url, purpose, f"Request timed out (no response in {PROBE_TIMEOUT} s)")
     except requests.RequestException as exc:
-        return _probe_failed(pid, url, purpose, f"连接资源失败：{type(exc).__name__}")
+        return _probe_failed(pid, url, purpose, f"Could not connect to the resource: {type(exc).__name__}")
     if 200 <= probe.status_code < 300:
-        sm.advance(pid, sm.RESOURCE_DELIVERED, verdict="FREE", rule_id="-", reason=f"HTTP {probe.status_code}，无需付款",
+        sm.advance(pid, sm.RESOURCE_DELIVERED, verdict="FREE", rule_id="-", reason=f"HTTP {probe.status_code}, no payment needed",
                    result_json=json.dumps(payment_executor.body(probe), ensure_ascii=False))
         return from_row(payments.get(pid))
     if probe.status_code != 402:
@@ -79,7 +79,7 @@ def fetch_paid(url: str, purpose: str, max_price_xrp: Optional[Decimal] = None, 
         quote = parse_402(probe)
     except QuoteError as exc:
         # 报价都解析不出来，没法评估风险，直接拒绝
-        return _deny(pid, url, purpose, None, Decision(DENY, "R0", f"402 报价无法解析：{exc}"), from_state=sm.RECEIVED)
+        return _deny(pid, url, purpose, None, Decision(DENY, "R0", f"Cannot parse the 402 quote: {exc}"), from_state=sm.RECEIVED)
     cfg = policy.load_policy()
     quote = _choose_method(quote, cfg)
     method = ESCROW_SCHEME if quote.scheme == ESCROW_SCHEME else "x402"
@@ -89,7 +89,7 @@ def fetch_paid(url: str, purpose: str, max_price_xrp: Optional[Decimal] = None, 
     decision = (_unsupported_scheme(quote) or _over_max_price(quote, max_price_xrp)
                 or evaluation.decide(quote, cfg))
     if decision.verdict == AUTO and method == ESCROW_SCHEME:
-        decision = Decision(HOLD, "ESCROW", "escrow 付款由金库锁款，需要人工审批和设备签名")
+        decision = Decision(HOLD, "ESCROW", "Escrow payments are locked by the treasury and need human approval and a device signature")
     decision_id = audit.log_decision(url, purpose, quote, decision, status=_DECISION_STATUS[decision.verdict])
     sm.advance(pid, sm.EVALUATED, verdict=decision.verdict, rule_id=decision.rule_id, reason=decision.reason,
                decision_id=decision_id)
@@ -122,13 +122,13 @@ def _probe_failed(pid: int, url: str, purpose: str, reason: str) -> GateResult:
 def _http_error(resp: requests.Response) -> str:
     text = f"HTTP {resp.status_code}" + (f" {resp.reason}" if resp.reason else "")
     if 300 <= resp.status_code < 400:
-        return f"{text}：资源要求重定向到 {resp.headers.get('Location', '（未给出地址）')[:120]}，不自动跟随"
-    return f"{text}：{'商户端错误' if resp.status_code >= 500 else '请求被拒绝或资源不存在'}"
+        return f"{text}: the resource redirects to {resp.headers.get('Location', '(no location given)')[:120]}; redirects are not followed"
+    return f"{text}: {'merchant-side error' if resp.status_code >= 500 else 'request refused or resource not found'}"
 
 
 def _replay(row: dict, url: str) -> GateResult:
     if row["url"] != url:
-        return GateResult("ERROR", "IDEMPOTENCY", f"request_id {row['request_id']} 已用于另一个 URL：{row['url']}",
+        return GateResult("ERROR", "IDEMPOTENCY", f"request_id {row['request_id']} was already used for another URL: {row['url']}",
                           url, state=row["state"], payment_id=row["id"], request_id=row["request_id"], replay=True)
     if row["state"] == sm.UNKNOWN_SETTLEMENT:
         row = reconcile(row["id"])
@@ -148,7 +148,7 @@ def _choose_method(quote: Quote, cfg: policy.PolicyConfig) -> Quote:
 def _unsupported_scheme(quote: Quote) -> Optional[Decision]:
     if quote.scheme in SUPPORTED_SCHEMES:
         return None
-    return Decision(DENY, "R1", f"不支持的付款方式 {quote.scheme}（只支持 {', '.join(sorted(SUPPORTED_SCHEMES))}）")
+    return Decision(DENY, "R1", f"Unsupported payment scheme {quote.scheme} (only {', '.join(sorted(SUPPORTED_SCHEMES))})")
 
 
 def _over_max_price(quote: Quote, max_price_xrp: Optional[Decimal]) -> Optional[Decision]:
@@ -157,7 +157,7 @@ def _over_max_price(quote: Quote, max_price_xrp: Optional[Decimal]) -> Optional[
     limit_drops = int(Decimal(str(max_price_xrp)) * DROPS_PER_XRP)   # 向下取整：宁可少付
     if quote.amount_drops <= limit_drops:
         return None
-    return Decision(DENY, "MAX_PRICE", f"报价 {fmt_xrp(quote.amount_drops)} XRP 超过调用方给的上限 {fmt_xrp(limit_drops)} XRP")
+    return Decision(DENY, "MAX_PRICE", f"Quote {fmt_xrp(quote.amount_drops)} XRP exceeds the caller's max price of {fmt_xrp(limit_drops)} XRP")
 
 
 def _hold(pid: int, url: str, purpose: str, quote: Quote, decision: Decision, decision_id: int,

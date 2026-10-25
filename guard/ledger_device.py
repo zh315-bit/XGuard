@@ -37,11 +37,11 @@ def _diagnose() -> str:
         texts = [e["text"] for e in requests.get(f"{base}/events", params={"currentscreenonly": "true"},
                                                  timeout=3).json()["events"]]
     except Exception:  # noqa: BLE001
-        return f"连不上 Speculos（{base}）：先运行 scripts/start_speculos.sh"
+        return f"Cannot reach Speculos ({base}): run scripts/start_speculos.sh first"
     if "Review transaction" in texts or any(" of " in t for t in texts) or "Hold to sign" in texts:
-        return ("设备正停在一笔没确认完的签名审核界面（通常是上次脚本在等设备确认时被中断）。"
-                "设备一次只能处理一个请求：在设备上点 Reject → Yes, reject 拒掉它（或 docker restart speculos-xrp），然后重试")
-    return f"设备操作失败（详见上方 [ledger] 输出）；当前设备屏幕：{' | '.join(texts) or '空'}"
+        return ("The device is stuck on an unfinished signing review (usually a previous script was interrupted while waiting). "
+                "The device handles one request at a time: press Reject → Yes, reject on the device (or docker restart speculos-xrp), then retry")
+    return f"Device operation failed (see the [ledger] output above); current screen: {' | '.join(texts) or 'empty'}"
 
 
 def _env() -> dict[str, str]:
@@ -65,5 +65,5 @@ def attach_signature(unsigned_hex: str, signature_hex: str) -> str:
     """把设备签名放进 TxnSignature，返回已签名的 blob；同时校验签名确实对应 SigningPubKey。"""
     tx = decode(unsigned_hex)
     if not is_valid_message(bytes.fromhex(encode_for_signing(tx)), bytes.fromhex(signature_hex), tx["SigningPubKey"]):
-        raise DeviceError("设备返回的签名验证不通过")
+        raise DeviceError("The signature returned by the device failed verification")
     return encode({**tx, "TxnSignature": signature_hex})

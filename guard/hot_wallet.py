@@ -65,17 +65,17 @@ def request_topup(amount_drops: int, reason: str) -> dict[str, Any]:
     """创建补款审批单。补完会超过上限的请求直接拒绝，不会生成审批单。"""
     cfg = policy.load_policy()
     if amount_drops <= 0:
-        raise CapExceeded("补款金额必须大于 0")
+        raise CapExceeded("The top-up amount must be greater than 0")
     balance = chain.balance_drops(address_of("agent"))
     _check_cap(balance, amount_drops, cfg)
 
     agent_address = address_of("agent")
     req = PaymentRequirements(scheme=TOPUP_SCHEME, network=cfg.network, amount=str(amount_drops), asset="XRP",
                               pay_to=agent_address, max_timeout_seconds=600,
-                              extra={"invoiceId": uuid.uuid4().hex.upper(), "description": "金库给热钱包补款"})
+                              extra={"invoiceId": uuid.uuid4().hex.upper(), "description": "Treasury top-up to the hot wallet"})
     quote = Quote(TOPUP_URL, req)
-    decision = Decision(HOLD, "TOPUP", f"热钱包补款 {fmt_xrp(amount_drops)} XRP：当前 {fmt_xrp(balance)}，"
-                                       f"补完 {fmt_xrp(balance + amount_drops)} / 上限 {fmt_xrp(cfg.hot_wallet_max_balance_drops)} XRP")
+    decision = Decision(HOLD, "TOPUP", f"Hot wallet top-up {fmt_xrp(amount_drops)} XRP: balance {fmt_xrp(balance)}, "
+                                       f"after top-up {fmt_xrp(balance + amount_drops)} / cap {fmt_xrp(cfg.hot_wallet_max_balance_drops)} XRP")
     row, _ = payments.create_or_get(OPERATOR, f"topup-{uuid.uuid4().hex[:12]}", TOPUP_URL, reason)
     pid = row["id"]
     sm.advance(pid, sm.QUOTED, quote_json=json.dumps(req.to_dict()), quote_hash=quote.terms_hash(),
@@ -104,7 +104,7 @@ def execute_topup(payment_id: int, signer: Signer, memo: dict[str, Any]) -> dict
         blob = run_sync(signer.sign(tx))
         verify_signed_blob(blob, tx, signer)
     except Exception as exc:  # noqa: BLE001 —— 还没发出任何交易
-        return _fail_before_submit(row, f"补款未执行：{exc}")
+        return _fail_before_submit(row, f"Top-up not executed: {exc}")
 
     tx_hash = Transaction.from_blob(blob).get_hash()
     sm.advance(payment_id, sm.SUBMITTED, tx_hash=tx_hash, last_ledger_sequence=tx.last_ledger_sequence,
@@ -114,7 +114,7 @@ def execute_topup(payment_id: int, signer: Signer, memo: dict[str, Any]) -> dict
     except chain.SubmitUnknown as exc:
         return _unknown(payment_id, str(exc))
     if chain.result_code(result) != "tesSUCCESS":
-        return _unknown(payment_id, f"补款交易结果 {chain.result_code(result)}")
+        return _unknown(payment_id, f"Top-up transaction result {chain.result_code(result)}")
     sm.advance(payment_id, sm.VALIDATED)
     new_balance = chain.balance_drops(row["pay_to"])
     sm.advance(payment_id, sm.RESOURCE_DELIVERED,
@@ -125,6 +125,6 @@ def execute_topup(payment_id: int, signer: Signer, memo: dict[str, Any]) -> dict
 
 def _check_cap(balance_drops: int, amount_drops: int, cfg: policy.PolicyConfig) -> None:
     if balance_drops + amount_drops > cfg.hot_wallet_max_balance_drops:
-        raise CapExceeded(f"补款后热钱包余额 {fmt_xrp(balance_drops + amount_drops)} XRP 会超过上限 "
-                          f"{fmt_xrp(cfg.hot_wallet_max_balance_drops)} XRP（当前 {fmt_xrp(balance_drops)}）")
+        raise CapExceeded(f"After the top-up the hot wallet would hold {fmt_xrp(balance_drops + amount_drops)} XRP, above the cap of "
+                          f"{fmt_xrp(cfg.hot_wallet_max_balance_drops)} XRP (balance {fmt_xrp(balance_drops)})")
 

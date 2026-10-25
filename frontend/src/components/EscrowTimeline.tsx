@@ -10,31 +10,31 @@ export function EscrowTimeline({ escrow: e }: { escrow: Escrow }) {
     <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm text-slate-200">
-          先验货再放款 · <span className="font-semibold">{e.amount_drops / 1_000_000} XRP</span> → {short(e.destination)}
+          Verify before release · <span className="font-semibold">{e.amount_drops / 1_000_000} XRP</span> → {short(e.destination)}
         </div>
         <EscrowStatus status={e.status} />
       </div>
-      {e.description && <p className="mb-3 text-xs text-slate-400">报价声明：{e.description}</p>}
+      {e.description && <p className="mb-3 text-xs text-slate-400">Quote says: {e.description}</p>}
       {e.status === "failed" && e.payment_error && (
         <p className="mb-3 rounded-md bg-rose-500/10 px-3 py-2 text-xs text-rose-300">{e.payment_error}</p>
       )}
       <ol className="space-y-3 border-l border-slate-700 pl-4">
-        <Step done={!!e.create_tx} bad={e.status === "failed"} title="① 锁款：金库 EscrowCreate（Ledger 签名）">
+        <Step done={!!e.create_tx} bad={e.status === "failed"} title="① Lock: treasury EscrowCreate (Ledger-signed)">
           <TxLink hash={e.create_tx} url={e.create_tx_url} />
-          <span className="ml-2 text-xs text-slate-500">条件 PREIMAGE-SHA-256，原像由守卫保管</span>
+          <span className="ml-2 text-xs text-slate-500">Condition PREIMAGE-SHA-256; the guard holds the preimage</span>
         </Step>
-        <Step done={!!e.delivery} title="② 交货：带 escrow 付款证明取数据">
+        <Step done={!!e.delivery} title="② Delivery: fetch the data with the escrow payment proof">
           {e.delivery ? (
             <pre className="mt-1 max-h-28 overflow-auto rounded bg-slate-900 p-2 text-[11px] text-slate-400">
               {JSON.stringify(e.delivery, null, 1).slice(0, 600)}
             </pre>
-          ) : <span className="text-xs text-slate-500">{e.status === "locked" ? "等待商户交货…" : "商户没有交货"}</span>}
+          ) : <span className="text-xs text-slate-500">{e.status === "locked" ? "Waiting for the merchant to deliver…" : "The merchant did not deliver"}</span>}
         </Step>
-        <Step done={!!v} bad={v?.verdict === "fail"} title="③ 验货：确定性检查 + LLM">
+        <Step done={!!v} bad={v?.verdict === "fail"} title="③ Verification: deterministic checks + LLM">
           {v ? (
             <div className="space-y-1">
               <div className={`text-sm font-medium ${v.verdict === "pass" ? "text-emerald-300" : "text-rose-300"}`}>
-                {v.verdict === "pass" ? "✓ 通过" : "✗ 不通过"} <span className="text-xs text-slate-500">（{v.source}）</span>
+                {v.verdict === "pass" ? "✓ Pass" : "✗ Fail"} <span className="text-xs text-slate-500">({v.source})</span>
               </div>
               <p className="text-xs text-slate-300">{v.reason}</p>
               <ul className="list-disc pl-4 text-[11px] text-slate-500">
@@ -48,18 +48,18 @@ export function EscrowTimeline({ escrow: e }: { escrow: Escrow }) {
                   </span>
                 ))}
               </div>
-              {e.verification_hash && <div className="font-mono text-[10px] text-slate-600">结论哈希 {short(e.verification_hash, 10)}（写进链上 Memo）</div>}
+              {e.verification_hash && <div className="font-mono text-[10px] text-slate-600">Verdict hash {short(e.verification_hash, 10)} (written to the on-chain Memo)</div>}
             </div>
-          ) : <span className="text-xs text-slate-500">等待交货</span>}
+          ) : <span className="text-xs text-slate-500">Waiting for delivery</span>}
         </Step>
         {!refunding ? (
-          <Step done={!!e.finish_tx} title="④ 放款：EscrowFinish（提交原像）">
-            {e.finish_tx ? <TxLink hash={e.finish_tx} url={e.finish_tx_url} /> : <span className="text-xs text-slate-500">验货通过后放款</span>}
+          <Step done={!!e.finish_tx} title="④ Release: EscrowFinish (submits the preimage)">
+            {e.finish_tx ? <TxLink hash={e.finish_tx} url={e.finish_tx_url} /> : <span className="text-xs text-slate-500">Released once verification passes</span>}
           </Step>
         ) : (
-          <Step done={!!e.cancel_tx} bad title="④ 退款：EscrowCancel（CancelAfter 之后）">
+          <Step done={!!e.cancel_tx} bad title="④ Refund: EscrowCancel (after CancelAfter)">
             {e.cancel_tx ? (
-              <span><TxLink hash={e.cancel_tx} url={e.cancel_tx_url} /> <span className="ml-2 text-xs text-emerald-300">已退回金库</span></span>
+              <span><TxLink hash={e.cancel_tx} url={e.cancel_tx_url} /> <span className="ml-2 text-xs text-emerald-300">Returned to the treasury</span></span>
             ) : <Countdown target={e.cancel_after_unix} />}
           </Step>
         )}
@@ -88,18 +88,18 @@ function Countdown({ target }: { target: number }) {
   const left = Math.max(0, Math.round(target - now));
   return (
     <span className="text-xs text-amber-300">
-      {left > 0 ? `钱锁在 escrow 里，${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} 后可以退款` : "已到期，正在提交退款…"}
+      {left > 0 ? `Funds are locked in escrow; refundable in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "Expired, submitting the refund…"}
     </span>
   );
 }
 
 function EscrowStatus({ status }: { status: string }) {
   const map: Record<string, [string, string]> = {
-    preparing: ["准备锁款", "text-slate-400"], failed: ["锁款未完成 · 没有动钱", "text-rose-300"],
-    locked: ["已锁款", "text-sky-300"], delivered: ["已交货", "text-sky-300"],
-    releasing: ["放款中", "text-sky-300"], released: ["已放款", "text-emerald-300"],
-    refund_pending: ["验货不通过 · 待退款", "text-amber-300"], refunding: ["退款中", "text-amber-300"],
-    refunded: ["已退款", "text-emerald-300"],
+    preparing: ["Preparing lock", "text-slate-400"], failed: ["Lock not completed · no funds moved", "text-rose-300"],
+    locked: ["Locked", "text-sky-300"], delivered: ["Delivered", "text-sky-300"],
+    releasing: ["Releasing", "text-sky-300"], released: ["Released", "text-emerald-300"],
+    refund_pending: ["Verification failed · refund pending", "text-amber-300"], refunding: ["Refunding", "text-amber-300"],
+    refunded: ["Refunded", "text-emerald-300"],
   };
   const [text, color] = map[status] ?? [status, "text-slate-400"];
   return <span className={`text-xs font-semibold ${color}`}>{text}</span>;

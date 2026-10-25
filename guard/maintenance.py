@@ -21,7 +21,7 @@ def sweep() -> None:
 
 def expire_approvals() -> None:
     for a in approvals.expired_pending():
-        reason = "审批单已过期：超过 approval_ttl_seconds 未被批准"
+        reason = "Approval expired: not approved within approval_ttl_seconds"
         approvals.mark_expired(a["id"], reason)
         audit.mark_expired(a["decision_id"], reason)
         try:
@@ -35,7 +35,7 @@ def expire_reservations() -> None:
         row = payments.get(r["payment_request_id"])
         if row["state"] in (sm.RESERVED, sm.SIGNING):
             try:
-                sm.advance(row["id"], sm.EXPIRED, error="预算预留已过期，付款未发出")
+                sm.advance(row["id"], sm.EXPIRED, error="Budget reservation expired; payment not sent")
             except sm.IllegalTransition:
                 continue
             budget.release(row["id"])

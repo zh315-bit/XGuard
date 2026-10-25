@@ -27,7 +27,7 @@ def require_env(name: str) -> str:
     """读取必需的环境变量；缺失时给出明确提示，而不是在深处报 KeyError。"""
     value = os.getenv(name)
     if not value:
-        raise RuntimeError(f"缺少环境变量 {name}，先运行 scripts/setup_wallets.py 生成 .env")
+        raise RuntimeError(f"Missing environment variable {name}; run scripts/setup_wallets.py to generate .env")
     return value
 
 

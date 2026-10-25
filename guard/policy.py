@@ -96,7 +96,7 @@ def xrp_to_drops(value: object) -> int:
     """配置里的 XRP 数（如 0.5）精确换算成整数 drops；不足 1 drop 的小数直接报错。"""
     drops = Decimal(str(value)) * DROPS_PER_XRP
     if drops != drops.to_integral_value():
-        raise ValueError(f"{value} XRP 不是整数 drops")
+        raise ValueError(f"{value} XRP is not a whole number of drops")
     return int(drops)
 
 
@@ -114,7 +114,7 @@ def _address_set(entries: Optional[list]) -> frozenset[str]:
 def _expand_required(value: str) -> str:
     expanded = os.path.expandvars(str(value)).strip()
     if not expanded or "$" in expanded:
-        raise ValueError(f"policy.yaml 里的 {value} 无法展开，检查 .env")
+        raise ValueError(f"{value} in policy.yaml cannot be expanded; check .env")
     return expanded
 
 
@@ -125,9 +125,9 @@ Rule = Callable[[Quote, EvalContext, PolicyConfig], Optional[Decision]]
 
 def r1_network_asset(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[Decision]:
     if q.network != cfg.network:
-        return Decision(DENY, "R1", f"网络 {q.network} 不是 {cfg.network}")
+        return Decision(DENY, "R1", f"Network {q.network} is not {cfg.network}")
     if q.asset not in cfg.allowed_assets:
-        return Decision(DENY, "R1", f"资产 {q.asset} 不在允许列表 {sorted(cfg.allowed_assets)}")
+        return Decision(DENY, "R1", f"Asset {q.asset} is not in the allowed list {sorted(cfg.allowed_assets)}")
     return None
 
 
@@ -138,27 +138,27 @@ def r7_hard_cap(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[Decis
 def check_hard_cap(amount_drops: int, cfg: PolicyConfig) -> Optional[Decision]:
     """R7 单独导出：人工批准时也要再查一次。"""
     if amount_drops > cfg.hard_cap_drops:
-        return Decision(DENY, "R7", f"金额 {fmt_xrp(amount_drops)} XRP 超过绝对上限 {fmt_xrp(cfg.hard_cap_drops)} XRP")
+        return Decision(DENY, "R7", f"Amount {fmt_xrp(amount_drops)} XRP exceeds the hard cap of {fmt_xrp(cfg.hard_cap_drops)} XRP")
     return None
 
 
 def r2_blacklist(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[Decision]:
     if q.pay_to in cfg.blacklist:
-        return Decision(DENY, "R2", f"收款地址 {q.pay_to} 在黑名单")
+        return Decision(DENY, "R2", f"Payee {q.pay_to} is on the blocklist")
     return None
 
 
 def r3_credential(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[Decision]:
     if ctx.payee_verified is None:
-        return Decision(HOLD, "R3", f"无法查询 {q.pay_to} 的链上凭证，按未认证处理")
+        return Decision(HOLD, "R3", f"Could not look up the on-chain credential of {q.pay_to}; treated as unverified")
     if not ctx.payee_verified:
-        return Decision(HOLD, "R3", f"收款地址 {q.pay_to} 没有有效的 {cfg.credential_type} 凭证")
+        return Decision(HOLD, "R3", f"Payee {q.pay_to} has no valid {cfg.credential_type} credential")
     return None
 
 
 def r4_auto_limit(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[Decision]:
     if q.amount_drops > cfg.auto_limit_drops:
-        return Decision(HOLD, "R4", f"金额 {fmt_xrp(q.amount_drops)} XRP 超过单笔自动上限 {fmt_xrp(cfg.auto_limit_drops)} XRP")
+        return Decision(HOLD, "R4", f"Amount {fmt_xrp(q.amount_drops)} XRP exceeds the per-payment auto limit of {fmt_xrp(cfg.auto_limit_drops)} XRP")
     return None
 
 
@@ -169,15 +169,15 @@ def r5_daily_budget(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[D
 
 def auto_budget_decision(committed_drops: int, amount_drops: int, cfg: PolicyConfig) -> Optional[Decision]:
     if committed_drops + amount_drops > cfg.daily_budget_drops:
-        return Decision(HOLD, "R5", f"今日自动付款已用/已预留 {fmt_xrp(committed_drops)} + 本笔 {fmt_xrp(amount_drops)} "
-                                    f"超过日预算 {fmt_xrp(cfg.daily_budget_drops)} XRP")
+        return Decision(HOLD, "R5", f"Auto payments spent/reserved today {fmt_xrp(committed_drops)} + this payment {fmt_xrp(amount_drops)} "
+                                    f"exceeds the daily budget of {fmt_xrp(cfg.daily_budget_drops)} XRP")
     return None
 
 
 def r6_rate_limit(q: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Optional[Decision]:
     if ctx.recent_payments_to_payee >= cfg.rate_max_requests:
-        return Decision(HOLD, "R6", f"{cfg.rate_window_seconds} 秒内已向该商户发起 "
-                                    f"{ctx.recent_payments_to_payee} 次付款，达到上限 {cfg.rate_max_requests} 次")
+        return Decision(HOLD, "R6", f"{ctx.recent_payments_to_payee} payments to this merchant in the last "
+                                    f"{cfg.rate_window_seconds} s, reaching the limit of {cfg.rate_max_requests}")
     return None
 
 
@@ -191,4 +191,4 @@ def evaluate(quote: Quote, ctx: EvalContext, cfg: PolicyConfig) -> Decision:
         decision = rule(quote, ctx, cfg)
         if decision is not None:
             return decision
-    return Decision(AUTO, "DEFAULT", "未命中任何规则，自动付款")
+    return Decision(AUTO, "DEFAULT", "No rule matched; paid automatically")

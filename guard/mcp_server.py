@@ -31,43 +31,43 @@ logging.getLogger("httpx").setLevel(logging.WARNING)  # xrpl-py 每次 RPC 都�
 server = MCPServer(
     name="agentguard",
     instructions=(
-        "AgentGuard 是你和钱包之间的支付守卫。所有付费 API（HTTP 402 / x402）都必须通过 fetch_paid_resource 访问，"
-        "你没有私钥，也不能绕过它。每次购买都要给一个唯一的 request_id；重试同一次购买必须复用同一个 request_id，"
-        "守卫保证同一个 request_id 只付一次钱。结果的 status：\n"
-        "- paid：已付款，content 就是数据\n"
-        "- pending_approval：需要人工审批，拿 approval_id 调用 wait_for_approval 等待，不要重复购买\n"
-        "- denied / rejected / expired：没有付款，不要重试同一个 URL，向用户说明原因并换数据源或跳过\n"
-        "- settlement_unknown：付款结果未知，绝不能用新的 request_id 重买"
+        "AgentGuard is the payment guard between you and the wallet. Every paid API (HTTP 402 / x402) must be accessed through fetch_paid_resource; "
+        "you hold no private keys and cannot bypass it. Give every purchase a unique request_id; retries of the same purchase must reuse it, "
+        "and the guard pays at most once per request_id. Result status:\n"
+        "- paid: paid; content is the data\n"
+        "- pending_approval: human approval needed; call wait_for_approval with approval_id; do not buy again\n"
+        "- denied / rejected / expired / fetch_failed: nothing paid; do not retry the same URL; tell the user why and use another source or skip it\n"
+        "- settlement_unknown: payment outcome unknown; never buy again with a new request_id"
     ),
 )
 
 
 @server.tool()
 async def fetch_paid_resource(
-    url: Annotated[str, Field(description="要访问的付费资源完整 URL")],
-    purpose: Annotated[str, Field(description="为什么需要这份数据（写进审计日志，审批人会看到）")],
-    max_price: Annotated[float, Field(description="你愿意为这份数据支付的最高价格，单位 XRP；报价超过它会直接拒绝")],
+    url: Annotated[str, Field(description="Full URL of the paid resource")],
+    purpose: Annotated[str, Field(description="Why this data is needed (recorded in the audit log and shown to approvers)")],
+    max_price: Annotated[float, Field(description="The most you are willing to pay for this data, in XRP; quotes above it are denied")],
     request_id: Annotated[str, Field(min_length=1, max_length=128, description=(
-        "这次购买的唯一 ID（例如 weekly-report-data-a）。重试同一次购买时必须用同一个 request_id，"
-        "守卫会直接返回已有结果而不会再付钱；买另一份数据要用新的 request_id"))],
+        "Unique ID for this purchase (e.g. weekly-report-data-a). Retries of the same purchase must use the same request_id; "
+        "the guard returns the existing result without paying again. Use a new request_id for a different dataset"))],
 ) -> dict[str, Any]:
-    """通过 AgentGuard 访问一个 x402 付费资源。守卫先看报价，按策略决定：
-    自动付款并返回数据（status=paid）；转人工审批（status=pending_approval，返回 approval_id——
-    接下来应调用 wait_for_approval 等待，不要重新请求）；或拒绝付款（status=denied，说明原因——
-    不要重试，换别的数据源或跳过这项）。"""
+    """Access an x402 paid resource through AgentGuard. The guard inspects the quote and, by policy, either
+    pays automatically and returns the data (status=paid); sends it for human approval (status=pending_approval with
+    approval_id; call wait_for_approval next and do not request again); or refuses to pay (status=denied with a reason;
+    do not retry, use another source or skip it)."""
     try:
         limit = Decimal(str(max_price))
     except InvalidOperation:
-        return {"status": "error", "reason": f"max_price 不是合法数字：{max_price}"}
+        return {"status": "error", "reason": f"max_price is not a valid number: {max_price}"}
     result = await asyncio.to_thread(fetch_paid, url, purpose, limit, agent_id=AGENT_ID, request_id=request_id)
     return views.present(result)
 
 
 @server.tool()
 async def list_data_sources() -> dict[str, Any]:
-    """列出可购买的数据目录：每项有 URL、标题、描述和参考价格（XRP，商户自己声明的）。
-    不确定该买什么数据时先调用它，再按任务需要挑选。参考价格只是商户的声明，实际以付款时的报价为准，
-    守卫会在付款时按策略检查报价。"""
+    """List the data catalog: each item has a URL, title, description and reference price (XRP, declared by the merchant).
+    Call it first when unsure what to buy, then pick what the task needs. Reference prices are only the merchant's claims;
+    the actual quote at payment time is what counts, and the guard checks it against policy."""
     return {"sources": data_sources()}
 
 
@@ -81,28 +81,28 @@ def data_sources() -> list[dict[str, Any]]:
 
 @server.tool()
 async def check_budget() -> dict[str, Any]:
-    """查看今天的付款额度（单位 XRP）：自动付款日预算、已用/已预留、剩余，单笔自动上限、绝对上限，
-    以及含人工批准在内的每日总上限。超过单笔自动上限或剩余预算的请求会进入人工审批。"""
+    """Show today's payment limits (XRP): daily auto budget, spent/reserved, remaining, per-payment auto limit, hard cap,
+    and the daily total cap including human-approved payments. Requests above the auto limit or remaining budget go to human approval."""
     return await asyncio.to_thread(budget.summary, policy.load_policy())
 
 
 @server.tool()
 async def approval_status(
-    approval_id: Annotated[int, Field(description="fetch_paid_resource 返回的 approval_id")],
+    approval_id: Annotated[int, Field(description="approval_id returned by fetch_paid_resource")],
 ) -> dict[str, Any]:
-    """查询一次人工审批的当前状态（只查一次，不等待）。pending：还在等审批人；
-    approved：已付款，content 是数据；rejected / expired：没有付款，reason 是原因——此时应换数据源或跳过。"""
+    """Check the current state of a human approval once (no waiting). pending: still waiting for the approver;
+    approved: paid, content is the data; rejected / expired: not paid, reason explains why; use another source or skip it."""
     return await asyncio.to_thread(_approval_view, approval_id)
 
 
 @server.tool()
 async def wait_for_approval(
-    approval_id: Annotated[int, Field(description="fetch_paid_resource 返回的 approval_id")],
-    timeout_s: Annotated[int, Field(description=f"最多等待多少秒（上限 {MAX_WAIT_SECONDS}）")] = 150,
+    approval_id: Annotated[int, Field(description="approval_id returned by fetch_paid_resource")],
+    timeout_s: Annotated[int, Field(description=f"Maximum seconds to wait (up to {MAX_WAIT_SECONDS})")] = 150,
 ) -> dict[str, Any]:
-    """等待人工审批出结果，直到 approved / rejected / expired 或超时。HOLD 之后调用这个。
-    approved 时直接返回数据；rejected / expired 时返回原因，应换数据源或跳过；
-    超时仍是 pending 时可以再调用一次继续等（审批单本身有有效期，过期后会变成 expired）。"""
+    """Wait for a human approval until approved / rejected / expired or the timeout. Call this after a HOLD.
+    approved returns the data; rejected / expired returns the reason, so use another source or skip it;
+    if still pending at the timeout you may call again (the approval itself expires and then becomes expired)."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + min(max(timeout_s, 1), MAX_WAIT_SECONDS)
     while True:

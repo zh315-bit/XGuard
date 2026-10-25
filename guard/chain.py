@@ -38,7 +38,7 @@ def submit_signed(blob: str) -> dict[str, Any]:
     try:
         return submit_and_wait(tx, get_client(), autofill=False, check_fee=False).result
     except Exception as exc:  # noqa: BLE001 —— 结果未知，交给按哈希对账
-        raise SubmitUnknown(tx.get_hash(), f"提交后没有拿到最终结果：{exc}") from exc
+        raise SubmitUnknown(tx.get_hash(), f"No final result after submission: {exc}") from exc
 
 
 def submit_with_wallet(tx: Transaction, wallet: Wallet) -> dict[str, Any]:

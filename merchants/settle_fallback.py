@@ -94,22 +94,22 @@ async def verify_on_chain(signature: str, book: InvoiceBook, used_tx: set[str], 
     tx = decode(blob)
 
     if tx_hash in used_tx:
-        raise ValueError(f"交易 {tx_hash} 已经交过货（重放）")
+        raise ValueError(f"Transaction {tx_hash} was already used for a delivery (replay)")
     reqs = await book.get(invoice_id)
     if not reqs:
-        raise ValueError(f"invoiceId {invoice_id} 不是本商户签发的、已过期或已使用")
+        raise ValueError(f"invoiceId {invoice_id} was not issued by this merchant, has expired, or was already used")
     req = next((r for r in reqs if r.pay_to == tx.get("Destination") and r.amount == tx.get("Amount")), None)
     if tx.get("TransactionType") != "Payment" or req is None:
-        raise ValueError("交易的收款方或金额与报价不符")
+        raise ValueError("The transaction destination or amount does not match the quote")
     if tx.get("InvoiceID") != invoice_id_to_invoice_id_field(invoice_id):
-        raise ValueError("交易的 InvoiceID 与报价的 invoiceId 不符")
+        raise ValueError("The transaction InvoiceID does not match the quote invoiceId")
 
     result = await _wait_validated(tx_hash, lookup)
     if result is None:
-        raise ValueError(f"交易 {tx_hash} 在 {CHAIN_WAIT_SECONDS} 秒内没有在链上验证")
+        raise ValueError(f"Transaction {tx_hash} was not validated on chain within {CHAIN_WAIT_SECONDS} s")
     meta = result.get("meta", {})
     if meta.get("TransactionResult") != "tesSUCCESS" or meta.get("delivered_amount") != req.amount:
-        raise ValueError(f"链上结果 {meta.get('TransactionResult')}，到账 {meta.get('delivered_amount')} 与报价不符")
+        raise ValueError(f"On-chain result {meta.get('TransactionResult')}, delivered {meta.get('delivered_amount')} does not match the quote")
     return {"tx_hash": tx_hash, "invoice_id": invoice_id, "network": req.network, "payer": tx.get("Account")}
 
 

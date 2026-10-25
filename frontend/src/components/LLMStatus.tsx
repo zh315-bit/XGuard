@@ -6,9 +6,9 @@ type Status = { ok: boolean; reason: string | null; probe: { ok: boolean; latenc
 export function LLMStatus() {
   const { data, error } = usePoll<Status>("/api/llm/status", 15_000);
   const ok = data?.ok && !error;
-  const text = !data ? "LLM 检查中…" : ok ? "LLM 正常" : "LLM 不可用";
-  const tip = !data ? "" : ok ? `Anthropic API 响应 ${data.probe.latency_ms ?? "—"} ms`
-    : error ?? data.reason ?? "最近的 LLM 调用失败";
+  const text = !data ? "Checking LLM…" : ok ? "LLM OK" : "LLM unavailable";
+  const tip = !data ? "" : ok ? `Anthropic API responded in ${data.probe.latency_ms ?? "—"} ms`
+    : error ?? data.reason ?? "The most recent LLM call failed";
   return (
     <span title={tip}
           className={`flex items-center gap-1.5 rounded-md px-2 py-1 font-medium ${

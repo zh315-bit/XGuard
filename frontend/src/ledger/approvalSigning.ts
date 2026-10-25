@@ -28,18 +28,18 @@ export async function approveWithLedger(approval: Approval, config: Config, onSt
     : undefined;
 
   if (!request) {
-    onStatus("后端正在重新校验报价、预留预算并准备待签交易…");
+    onStatus("The backend is re-checking the quote, reserving budget and preparing the transaction…");
     // R3（收款方未认证）：后端要求带上审批人手动输入的收款地址后 4 位
     const view = await postJson<Approval>(`/approvals/${approval.id}/approve`,
       confirmPayeeSuffix ? { confirm_payee_suffix: confirmPayeeSuffix } : {});
     if (config.signer_mode !== "speculos") return;                 // software 模式：后端已经签好付完
     if (view.payment_state !== "SIGNING" || !view.signing_request) {
-      throw new Error(view.reject_reason ?? view.payment_error ?? `批准未进入签名阶段（${view.payment_state}）`);
+      throw new Error(view.reject_reason ?? view.payment_error ?? `Approval did not reach the signing stage (${view.payment_state})`);
     }
     request = view.signing_request;
   }
 
-  onStatus("连接 Ledger（Speculos）…");
+  onStatus("Connecting to the Ledger (Speculos)…");
   let signature: string;
   try {
     const ledger = await connectOnce(config);
@@ -47,11 +47,11 @@ export async function approveWithLedger(approval: Approval, config: Config, onSt
   } catch (e) {
     device = undefined;
     const reason = e instanceof Error ? e.message : String(e);
-    await postJson(`/approvals/${approval.id}/signature/cancel`, { reason: `设备签名失败：${reason}` }).catch(() => undefined);
-    throw new Error(reason.includes("6985") ? "已在设备上拒绝签名" : reason);
+    await postJson(`/approvals/${approval.id}/signature/cancel`, { reason: `Device signing failed: ${reason}` }).catch(() => undefined);
+    throw new Error(reason.includes("6985") ? "Signing was rejected on the device" : reason);
   }
 
-  onStatus("设备已签名，提交给后端校验并上链…");
+  onStatus("Signed on the device; submitting to the backend for checks and on-chain submission…");
   const signedBlob = encode({ ...request.tx_json, TxnSignature: signature } as Parameters<typeof encode>[0]);
   await postJson(`/approvals/${approval.id}/signature`, { signed_blob: signedBlob });
 }

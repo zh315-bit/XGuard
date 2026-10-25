@@ -51,28 +51,28 @@ app = FastAPI(title="AgentGuard", lifespan=lifespan)
 
 class PaymentBody(BaseModel):
     agent_id: str = Field(min_length=1, max_length=64)
-    request_id: str = Field(min_length=1, max_length=128, description="幂等键：同一个 request_id 只会付一次")
+    request_id: str = Field(min_length=1, max_length=128, description="Idempotency key: a request_id is paid at most once")
     url: str
     purpose: str
     max_price_xrp: Optional[Decimal] = None
 
 
 class RejectBody(BaseModel):
-    reason: str = "审批人拒绝"
+    reason: str = "Rejected by the approver"
 
 
 class ApproveBody(BaseModel):
     confirm_payee_suffix: Optional[str] = Field(default=None, max_length=8,
-                                                description="R3（收款方未认证）审批单必填：收款地址的后 4 位")
+                                                description="Required for R3 (unverified payee) approvals: last 4 characters of the payee address")
 
 
 class SignatureBody(BaseModel):
-    signed_blob: str = Field(min_length=10, description="设备签好的交易 blob（hex）")
+    signed_blob: str = Field(min_length=10, description="Transaction blob signed by the device (hex)")
 
 
 class TopupBody(BaseModel):
     amount_xrp: Decimal = Field(gt=0)
-    reason: str = "热钱包补款"
+    reason: str = "Hot wallet top-up"
 
 
 class MissionBody(BaseModel):
@@ -118,7 +118,7 @@ async def create_payment(body: PaymentBody) -> dict[str, Any]:
 def get_payment(agent_id: str, request_id: str) -> dict[str, Any]:
     row = payments.get_by_request(agent_id, request_id)
     if row is None:
-        raise HTTPException(404, "没有这个 request_id")
+        raise HTTPException(404, "No such request_id")
     return views.present(from_row(reconcile(row["id"])))
 
 
@@ -172,7 +172,7 @@ def submit_signature(approval_id: int, body: SignatureBody) -> dict[str, Any]:
 
 @app.post("/approvals/{approval_id}/signature/cancel")
 def cancel_signature(approval_id: int, body: Optional[RejectBody] = None) -> dict[str, Any]:
-    return approval_service.cancel_signature(approval_id, (body or RejectBody(reason="设备上拒绝签名")).reason)
+    return approval_service.cancel_signature(approval_id, (body or RejectBody(reason="Signing rejected on the device")).reason)
 
 
 @app.post("/approvals/{approval_id}/reject")
@@ -198,10 +198,10 @@ def _payer(payment: Optional[dict]) -> Optional[str]:
     if payment is None:
         return None
     if payment["method"] == "topup":
-        return "金库 → 热钱包（补款，Ledger 签名）"
+        return "Treasury → hot wallet (top-up, Ledger-signed)"
     if payment["method"] == "escrow":
-        return "金库（escrow，Ledger 签名锁款）"
-    return {"approved": "金库（Ledger 签名）", "auto": "热钱包"}.get(payment["kind"])
+        return "Treasury (escrow lock, Ledger-signed)"
+    return {"approved": "Treasury (Ledger-signed)", "auto": "Hot wallet"}.get(payment["kind"])
 
 
 @app.get("/api/config")
@@ -221,7 +221,7 @@ def get_treasury() -> dict[str, Any]:
 
 
 class SettingsBody(BaseModel):
-    changes: dict[str, str] = Field(description="要修改的项，键见 GET /api/settings，值是 XRP 数（字符串）")
+    changes: dict[str, str] = Field(description="Items to change; keys as in GET /api/settings, values are XRP amounts (strings)")
 
 
 @app.get("/api/llm/status")
@@ -265,7 +265,7 @@ def list_escrows() -> list[dict[str, Any]]:
 @app.post("/api/escrows/{payment_id}/refund")
 def refund_escrow(payment_id: int) -> dict[str, Any]:
     if escrow.get(payment_id) is None:
-        raise HTTPException(404, "没有这个 escrow")
+        raise HTTPException(404, "No such escrow")
     try:
         escrow.refund(payment_id)
     except escrow.TooEarlyToCancel as exc:
@@ -303,7 +303,7 @@ def register_mission(body: MissionRegisterBody) -> dict[str, Any]:
     """命令行 / demo_run 启动的 agent 自己登记任务记录（只是为了在 Mission 页面显示）。"""
     busy = mission_runner.running_mission()
     if busy:
-        raise HTTPException(409, f"任务 #{busy['id']} 正在运行")
+        raise HTTPException(409, f"Mission #{busy['id']} is running")
     return {"id": missions.create(body.task, source="cli", pid=body.pid)}
 
 
@@ -344,14 +344,14 @@ def get_merchant_e_mode() -> dict[str, Any]:
     try:
         return requests.get(f"{merchant}/data/e/mode", timeout=5).json()
     except requests.RequestException as exc:
-        raise HTTPException(502, f"连不上演示商户：{exc}") from exc
+        raise HTTPException(502, f"Cannot reach the demo merchant: {exc}") from exc
 
 
 @app.post("/api/demo/merchant-e-mode")
 def set_merchant_e_mode(body: ModeBody) -> dict[str, Any]:
     """演示用：切换商户 E 交付正常数据还是垃圾数据。只在 DEMO_MODE=true 时可用。"""
     if env("DEMO_MODE", "false").lower() != "true":
-        raise HTTPException(403, "只在 DEMO_MODE=true 时可用")
+        raise HTTPException(403, "Only available when DEMO_MODE=true")
     merchant = env("MERCHANT_BASE_URL", "http://127.0.0.1:8000")
     resp = requests.post(f"{merchant}/data/e/mode", json={"mode": body.mode}, timeout=5)
     if resp.status_code != 200:
@@ -364,9 +364,9 @@ def demo_reset() -> dict[str, Any]:
     """清空本地审计、预算、审批、支付请求（R6 频率也由它们统计），并重置商户 D 的调包计数。
     链上交易不会也不需要撤销。只在 DEMO_MODE=true 时可用。"""
     if env("DEMO_MODE", "false").lower() != "true":
-        raise HTTPException(403, "demo reset 只在 .env 里 DEMO_MODE=true 时可用")
+        raise HTTPException(403, "Demo reset is only available when DEMO_MODE=true in .env")
     if mission_runner.running_mission():
-        raise HTTPException(409, "有任务正在运行：先取消或等它结束再重置")
+        raise HTTPException(409, "A mission is running: cancel it or wait for it to finish before resetting")
     tables = ("escrows", "signing_requests", "budget_reservations", "approvals", "payment_requests", "decisions",
               "mission_events", "missions")
     with connect() as conn:

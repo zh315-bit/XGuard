@@ -7,7 +7,7 @@ transaction the guard signs carries an on-chain Memo. The agent never gets acces
 
 ## Screenshots
 
-The console (UI text is in Chinese), captured during a "weekly report" mission: data source A was paid automatically,
+The console, captured during a "weekly report" mission: data source A was paid automatically,
 and B (8 XRP, above the 1 XRP auto limit) is waiting for human approval.
 
 **Mission**: start a mission, see today's spend report and every step the agent takes.
@@ -143,8 +143,7 @@ option in the 402 quote. Merchants that only support `exact` (e.g. `/data/b`) ar
 
 ### Quote format
 
-The 402 response keeps the x402 v2 `PaymentRequired` structure, but the `scheme` in `accepts` is the custom `"escrow"`
-(the demo merchant's actual description is in Chinese; it is translated here):
+The 402 response keeps the x402 v2 `PaymentRequired` structure, but the `scheme` in `accepts` is the custom `"escrow"`:
 
 ```json
 {
@@ -152,7 +151,7 @@ The 402 response keeps the x402 v2 `PaymentRequired` structure, but the `scheme`
   "amount": "6000000", "payTo": "r...", "maxTimeoutSeconds": 600,
   "extra": {
     "invoiceId": "…",
-    "description": "XRPL DEX weekly volume: the 7 days of the ISO week (Mon–Sun) declared in dataSchema.coverage, one volume value per day (in XRP), plus the 7-day total",
+    "description": "XRPL DEX weekly volume: the 7 days of the ISO week (Mon-Sun) declared in dataSchema.coverage, one volume value per day (in XRP), plus the 7-day total",
     "dataSchema": {"profile": "xrpl_dex_7day",
                    "required": ["dataset", "week", "unit", "daily", "total_volume_xrp"],
                    "series": {"field": "daily", "min_items": 7, "date_field": "date", "value_field": "volume_xrp"},

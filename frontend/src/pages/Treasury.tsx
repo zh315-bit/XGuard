@@ -20,12 +20,12 @@ export function Treasury() {
           <SecurityBoundary t={t} />
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Stat label="今日已花费" value={`${t.budget_detail.spent_xrp ?? "0"} XRP`} sub="自动 + 人工批准，已上链" />
-            <Stat label="预留中" value={`${t.budget_detail.reserved_xrp ?? "0"} XRP`} sub="已判定、付款进行中" tone="warn" />
-            <Stat label="自动付款剩余" value={`${t.budget.auto_remaining_today_xrp} XRP`}
-                  sub={`日预算 ${t.budget.auto_daily_budget_xrp} XRP · 单笔上限 ${t.budget.auto_limit_per_payment_xrp} XRP`} tone="good" />
-            <Stat label="每日总上限" value={`${t.budget.total_committed_today_xrp} / ${t.budget.daily_total_cap_xrp}`}
-                  sub={`XRP，人工批准也不能突破 · 硬上限 ${t.budget.hard_cap_per_payment_xrp} XRP/笔`} />
+            <Stat label="Spent today" value={`${t.budget_detail.spent_xrp ?? "0"} XRP`} sub="Auto + human-approved, on chain" />
+            <Stat label="Reserved" value={`${t.budget_detail.reserved_xrp ?? "0"} XRP`} sub="Evaluated, payment in progress" tone="warn" />
+            <Stat label="Auto budget left" value={`${t.budget.auto_remaining_today_xrp} XRP`}
+                  sub={`Daily budget ${t.budget.auto_daily_budget_xrp} XRP · per payment ${t.budget.auto_limit_per_payment_xrp} XRP`} tone="good" />
+            <Stat label="Daily total cap" value={`${t.budget.total_committed_today_xrp} / ${t.budget.daily_total_cap_xrp}`}
+                  sub={`XRP, cannot be exceeded even with approval · hard cap ${t.budget.hard_cap_per_payment_xrp} XRP/payment`} />
           </div>
 
           <SettingsCard />
@@ -33,8 +33,8 @@ export function Treasury() {
           <HotWalletCap t={t} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <WalletCard title="Agent 热钱包" subtitle="小额自动付款；私钥在守卫服务端，agent 拿不到" account={t.hot_wallet} />
-            <WalletCard title="金库 Treasury" subtitle="大额付款只能经人工审批 + Ledger 签名" account={t.treasury} />
+            <WalletCard title="Agent hot wallet" subtitle="Small automatic payments; the key is on the guard server, out of the agent's reach" account={t.hot_wallet} />
+            <WalletCard title="Treasury" subtitle="Large payments only with human approval + Ledger signature" account={t.treasury} />
           </div>
 
         </>
@@ -48,18 +48,18 @@ export function Treasury() {
         </Card>
       )}
 
-      <Card title={`链上交易（${txs.length}）`}>
-        {txs.length === 0 ? <Empty>还没有上链的付款</Empty> : (
+      <Card title={`On-chain transactions (${txs.length})`}>
+        {txs.length === 0 ? <Empty>No on-chain payments yet</Empty> : (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
-                <th className="pb-2 pr-3 font-medium">时间（UTC）</th>
-                <th className="pb-2 pr-3 font-medium">资源</th>
-                <th className="pb-2 pr-3 font-medium">结果</th>
-                <th className="pb-2 pr-3 font-medium text-right">金额</th>
-                <th className="pb-2 pr-3 font-medium">收款方</th>
-                <th className="pb-2 pr-3 font-medium">付款方</th>
-                <th className="pb-2 font-medium text-right">交易哈希</th>
+                <th className="pb-2 pr-3 font-medium">Time (UTC)</th>
+                <th className="pb-2 pr-3 font-medium">Resource</th>
+                <th className="pb-2 pr-3 font-medium">Result</th>
+                <th className="pb-2 pr-3 font-medium text-right">Amount</th>
+                <th className="pb-2 pr-3 font-medium">Payee</th>
+                <th className="pb-2 pr-3 font-medium">Payer</th>
+                <th className="pb-2 font-medium text-right">Tx hash</th>
               </tr>
             </thead>
             <tbody>
@@ -89,32 +89,32 @@ function SecurityBoundary({ t }: { t: TreasuryT }) {
   return (
     <section className={`rounded-xl border p-5 ${allOk ? "border-emerald-500/40 bg-emerald-500/[0.04]" : "border-amber-500/40 bg-amber-500/[0.04]"}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold text-slate-100">安全边界</h2>
+        <h2 className="text-base font-semibold text-slate-100">Security boundaries</h2>
         <p className={`text-sm ${allOk ? "text-emerald-300" : "text-amber-300"}`}>
-          {allOk ? "链上配置已到位（前提见下方）" : "还有保护没到位，见下方标黄的项目"}
+          {allOk ? "On-chain configuration in place (see the precondition below)" : "Some protections are missing; see the highlighted items below"}
         </p>
       </div>
       <DemoDeviceNotice />
       <ul className="mt-3 space-y-1.5 text-sm text-slate-300">
-        <li><b className="text-slate-100">热钱包：</b>私钥在服务器上，余额封顶 {s.hot_wallet_cap_xrp} XRP，这是服务器能直接动用的上限</li>
-        <li><b className="text-slate-100">金库：</b>每笔付款都需要设备签名，必须核对设备屏幕上的收款地址和金额</li>
-        <li><b className="text-slate-100">Escrow：</b>锁定中的资金以锁定金额为限，放款用的原像由守卫保存</li>
-        <li className="text-amber-200"><b>前提：</b>以上边界需要真实硬件设备；本演示中 Speculos 与服务器在同一台电脑上，边界是模拟的</li>
+        <li><b className="text-slate-100">Hot wallet: </b>the key is on the server and the balance is capped at {s.hot_wallet_cap_xrp} XRP, the most the server can spend directly</li>
+        <li><b className="text-slate-100">Treasury: </b>every payment needs a device signature; the payee and amount must be checked on the device screen</li>
+        <li><b className="text-slate-100">Escrow: </b>locked funds are limited to the locked amount; the guard holds the release preimage</li>
+        <li className="text-amber-200"><b>Precondition: </b>these boundaries need a real hardware device; in this demo Speculos runs on the same computer as the server, so they are simulated</li>
       </ul>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <Boundary ok={s.master_disabled} label="金库主密钥"
-                  value={s.master_disabled ? "已禁用" : "未禁用"}
-                  detail={s.master_disabled ? "服务器上的金库 seed 已失效（链上 lsfDisableMaster）" : "运行 scripts/lock_treasury.py 禁用"}
+        <Boundary ok={s.master_disabled} label="Treasury master key"
+                  value={s.master_disabled ? "Disabled" : "Not disabled"}
+                  detail={s.master_disabled ? "The treasury seed on the server no longer works (lsfDisableMaster on chain)" : "Run scripts/lock_treasury.py to disable it"}
                   link={s.disable_master_tx_url ?? s.treasury_url}
-                  linkText={s.disable_master_tx_url ? "禁用交易 ↗" : "金库账户 ↗"} />
-        <Boundary ok={s.regular_key_is_device} label="Regular Key（唯一能签金库的钥匙）"
-                  value={s.regular_key ? short(s.regular_key, 8) : "未设置"} mono
-                  detail={s.regular_key_is_device ? "= Ledger 设备地址（44'/144'/0'/0/0）" : "不是当前设备"}
-                  link={s.regular_key_url ?? s.treasury_url} linkText="设备账户 ↗" />
-        <Boundary ok={hotOk} label="热钱包上限 / 当前余额"
+                  linkText={s.disable_master_tx_url ? "Disable tx ↗" : "Treasury account ↗"} />
+        <Boundary ok={s.regular_key_is_device} label="Regular Key (the only key that can sign for the treasury)"
+                  value={s.regular_key ? short(s.regular_key, 8) : "Not set"} mono
+                  detail={s.regular_key_is_device ? "= Ledger device address (44'/144'/0'/0/0)" : "Not the current device"}
+                  link={s.regular_key_url ?? s.treasury_url} linkText="Device account ↗" />
+        <Boundary ok={hotOk} label="Hot wallet cap / balance"
                   value={`${s.hot_wallet_cap_xrp} / ${s.hot_wallet_balance_xrp?.toLocaleString(undefined, { maximumFractionDigits: 6 }) ?? "—"} XRP`}
-                  detail="私钥在服务器上，余额是服务器能直接动用的上限；补款只能经审批 + 设备签名"
-                  link={s.hot_wallet_url} linkText="热钱包账户 ↗" />
+                  detail="The key is on the server, so the balance is the most it can spend directly; top-ups need approval + a device signature"
+                  link={s.hot_wallet_url} linkText="Hot wallet account ↗" />
       </div>
     </section>
   );
@@ -144,23 +144,23 @@ function HotWalletCap({ t }: { t: TreasuryT }) {
   const topup = async () => {
     setMsg(undefined);
     try {
-      const r = await postJson<{ approval_id: number }>("/api/hot-wallet/topup", { amount_xrp: amount, reason: "控制台发起的热钱包补款" });
-      setMsg(`已生成补款审批单 #${r.approval_id}：去 Approvals 页用 Ledger 签名`);
+      const r = await postJson<{ approval_id: number }>("/api/hot-wallet/topup", { amount_xrp: amount, reason: "Hot wallet top-up from the console" });
+      setMsg(`Created top-up approval #${r.approval_id}: sign it with the Ledger on the Approvals page`);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     }
   };
   return (
-    <Card title="热钱包余额上限" right={<span className="text-xs text-slate-500">服务器能直接动用的上限</span>}>
+    <Card title="Hot wallet balance cap" right={<span className="text-xs text-slate-500">The most the server can spend directly</span>}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">热钱包上限 / 当前余额</div>
+          <div className="text-xs uppercase tracking-wider text-slate-500">Hot wallet cap / balance</div>
           <div className={`mt-1 text-3xl font-semibold tabular-nums ${hot.within_cap ? "text-emerald-300" : "text-rose-300"}`}>
             {hot.cap_xrp} XRP / {hot.balance_xrp?.toLocaleString(undefined, { maximumFractionDigits: 6 }) ?? "—"} XRP
           </div>
           <div className="mt-2 flex gap-4 text-xs">
-            <a href={hot.explorer_url} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">热钱包账户 ↗</a>
-            <a href={t.treasury.explorer_url} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">金库账户 ↗</a>
+            <a href={hot.explorer_url} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Hot wallet account ↗</a>
+            <a href={t.treasury.explorer_url} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">Treasury account ↗</a>
           </div>
         </div>
         <div className="text-right">
@@ -169,16 +169,16 @@ function HotWalletCap({ t }: { t: TreasuryT }) {
                    className="w-20 rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-right text-sm text-slate-100" />
             <span className="text-sm text-slate-400">XRP</span>
             <button onClick={topup} className="rounded-lg border border-sky-500/50 px-3 py-1.5 text-sm text-sky-300 hover:bg-sky-500/10">
-              从金库补款
+              Top up from treasury
             </button>
           </div>
-          <div className="mt-1 text-[11px] text-slate-500">只能由金库付款：人工审批 + Ledger 签名，补完不超过上限</div>
+          <div className="mt-1 text-[11px] text-slate-500">Paid by the treasury only: human approval + Ledger signature, never above the cap</div>
         </div>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
         <div className={`h-full ${hot.within_cap ? "bg-emerald-400" : "bg-rose-400"}`} style={{ width: `${pct}%` }} />
       </div>
-      {!hot.within_cap && <p className="mt-2 text-xs text-rose-300">超过上限：运行 scripts/cap_hot_wallet.py 把多出的部分转回金库</p>}
+      {!hot.within_cap && <p className="mt-2 text-xs text-rose-300">Above the cap: run scripts/cap_hot_wallet.py to send the excess back to the treasury</p>}
       {msg && <p className="mt-2 text-xs text-sky-300">{msg}</p>}
     </Card>
   );
@@ -186,7 +186,7 @@ function HotWalletCap({ t }: { t: TreasuryT }) {
 
 function WalletCard({ title, subtitle, account }: { title: string; subtitle: string; account: TreasuryT["treasury"] }) {
   return (
-    <Card title={title} right={<a href={account.explorer_url} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline">浏览器 ↗</a>}>
+    <Card title={title} right={<a href={account.explorer_url} target="_blank" rel="noreferrer" className="text-xs text-sky-400 hover:underline">Explorer ↗</a>}>
       <div className="text-3xl font-semibold tabular-nums text-slate-100">
         {account.balance_xrp !== undefined ? `${account.balance_xrp.toLocaleString(undefined, { maximumFractionDigits: 6 })} XRP` : "—"}
       </div>

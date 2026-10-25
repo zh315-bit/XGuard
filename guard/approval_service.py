@@ -47,13 +47,13 @@ async def approve(approval_id: int, signer: Signer | None = None,
     if payee_confirmation_required(approval):
         pay_to = json.loads(approval["quote_json"])["payTo"]
         if (confirm_payee_suffix or "").strip() != pay_to[-4:]:
-            raise ApprovalError(400, "收款方未认证（R3），可能是钓鱼地址：批准前请输入收款地址的后 4 位确认")
+            raise ApprovalError(400, "Unverified payee (R3), possibly a phishing address: type the last 4 characters of the payee address to confirm")
     if not approvals.try_lock(approval_id):
-        raise ApprovalError(409, f"审批单 #{approval_id} 正在处理或已处理，批准是一次性的，不会再次付款")
+        raise ApprovalError(409, f"Approval #{approval_id} is being processed or already handled; approval is one-time and will not pay again")
     payment = payments.get(approval["payment_request_id"])
 
     if time.time() > approval["expires_at"]:
-        _expire(approval, "报价已过期，不能再批准；请让 agent 重新请求")
+        _expire(approval, "The quote has expired and can no longer be approved; ask the agent to request again")
         return view(approval_id)
 
     cfg = policy.load_policy()
@@ -65,7 +65,7 @@ async def approve(approval_id: int, signer: Signer | None = None,
             budget.reserve(payment["id"], payment["amount_drops"], budget.APPROVED_KIND, cfg,
                            from_state=sm.PENDING_APPROVAL)
         except BudgetExceeded as exc:
-            _reject(approval, f"无法批准（{exc.decision.rule_id}）：{exc.decision.reason}")
+            _reject(approval, f"Cannot approve ({exc.decision.rule_id}): {exc.decision.reason}")
             return view(approval_id)
 
     signer = signer or approval_signer(approval_id, payment["id"], cfg.approval_ttl_seconds)
@@ -89,11 +89,11 @@ def submit_signature(approval_id: int, signed_blob: str) -> dict[str, Any]:
     """前端 / CLI 提交设备签好的 blob。校验不通过 → 400，这次付款失败，不会发出任何交易。"""
     approval = approvals.get(approval_id)
     if approval is None:
-        raise ApprovalError(404, f"审批单 #{approval_id} 不存在")
+        raise ApprovalError(404, f"Approval #{approval_id} does not exist")
     try:
         signing_requests.submit(approval, signed_blob)
     except signing_requests.SignatureRejected as exc:
-        raise ApprovalError(400, f"签名被拒绝：{exc}") from exc
+        raise ApprovalError(400, f"Signature rejected: {exc}") from exc
     return view(approval_id)
 
 
@@ -118,13 +118,13 @@ async def _execute_and_finish(approval_id: int, payment_id: int, signer: Signer,
     try:
         row = await asyncio.to_thread(_executor(method), payment_id, signer, memo)
     except Exception as exc:
-        approvals.mark_approved(approval_id, None, None, error=f"付款执行异常：{exc}")
-        raise ApprovalError(502, f"批准后付款执行异常：{exc}") from exc
+        approvals.mark_approved(approval_id, None, None, error=f"Payment execution error: {exc}")
+        raise ApprovalError(502, f"Payment execution error after approval: {exc}") from exc
     if row["state"] == sm.DENIED:
-        approvals.mark_rejected(approval_id, f"自动拒绝：{row['reason']}")
+        approvals.mark_rejected(approval_id, f"Automatically rejected: {row['reason']}")
     elif row["state"] == sm.FAILED:
         # 付款前就失败（例如设备上拒绝签名、签名校验不通过）：钱没有动，按拒绝处理
-        approvals.mark_rejected(approval_id, f"付款未完成：{row.get('error')}")
+        approvals.mark_rejected(approval_id, f"Payment not completed: {row.get('error')}")
     else:
         approvals.mark_approved(approval_id, row.get("tx_hash"), payments.result(row),
                                 error=None if row["state"] == sm.RESOURCE_DELIVERED else row.get("error"))
@@ -134,7 +134,7 @@ def reject(approval_id: int, reason: str) -> dict[str, Any]:
     maintenance.sweep()
     approval = _require_pending(approval_id)
     if not approvals.try_lock(approval_id):
-        raise ApprovalError(409, f"审批单 #{approval_id} 正在处理或已处理")
+        raise ApprovalError(409, f"Approval #{approval_id} is being processed or already handled")
     _reject(approval, reason)
     return view(approval_id)
 
@@ -143,7 +143,7 @@ def view(approval_id: int) -> dict[str, Any]:
     """审批单 + 对应支付请求的状态。API、CLI、MCP 都用这个视图。"""
     a = approvals.get(approval_id)
     if a is None:
-        raise ApprovalError(404, f"审批单 #{approval_id} 不存在")
+        raise ApprovalError(404, f"Approval #{approval_id} does not exist")
     p = payments.get(a["payment_request_id"]) if a.get("payment_request_id") else None
     out = {k: v for k, v in a.items() if k not in ("quote_json", "result_json", "risk_json", "snapshot_json")}
     out["acceptance"] = approvals.acceptance(a) or None
@@ -179,10 +179,10 @@ def _budget_impact(a: dict) -> dict[str, Any]:
 def _require_pending(approval_id: int) -> dict:
     approval = approvals.get(approval_id)
     if approval is None:
-        raise ApprovalError(404, f"审批单 #{approval_id} 不存在")
+        raise ApprovalError(404, f"Approval #{approval_id} does not exist")
     if approval["status"] != "pending":
-        raise ApprovalError(409, f"审批单 #{approval_id} 当前状态是 {approval['status']}，"
-                                 f"批准是一次性的，不会再次付款")
+        raise ApprovalError(409, f"Approval #{approval_id} is currently {approval['status']}; "
+                                 f"approval is one-time and will not pay again")
     return approval
 
 

@@ -5,22 +5,22 @@
 
 sources:
   - url: "{base}/data/a"
-    title: XRPL DEX 成交量（主要交易对）
-    description: XRPL DEX 主要交易对的单日成交量
+    title: XRPL DEX volume (major pairs)
+    description: Daily volume of the major XRPL DEX pairs
     reference_price_xrp: 0.01
   - url: "{base}/data/b"
-    title: 巨鲸资金流向
-    description: 链上头部钱包近 7 天的净资金流向
+    title: Whale fund flows
+    description: Net fund flows of the largest on-chain wallets over the last 7 days
     reference_price_xrp: 8
   - url: "{base}/data/c"
-    title: 交易信号
-    description: 基于链上数据的市场交易信号
+    title: Trading signals
+    description: Market trading signals based on on-chain data
     reference_price_xrp: 0.01
   - url: "{base}/data/d"
-    title: DEX 成交量（镜像源）
-    description: XRPL DEX 单日成交量，另一个数据提供方
+    title: DEX volume (mirror source)
+    description: Daily XRPL DEX volume from another data provider
     reference_price_xrp: 0.01
   - url: "{base}/data/e"
-    title: XRPL 本周 DEX 交易量（每日）
-    description: XRPL 本周 DEX 交易量，含最近 7 天每天的数值；该商户使用 escrow 收款（验货后放款）
+    title: XRPL weekly DEX volume (daily)
+    description: XRPL DEX volume for the last complete ISO week, one value per day; this merchant is paid via escrow (released after verification)
     reference_price_xrp: 6

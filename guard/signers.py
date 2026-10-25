@@ -93,9 +93,9 @@ class ExternalSigner(Signer):
 
     async def sign(self, tx: Transaction) -> str:
         if tx.account != self._account or tx.signing_pub_key != self._public_key:
-            raise SigningFailed("待签交易的 Account / SigningPubKey 不是金库 / 设备")
+            raise SigningFailed("The Account / SigningPubKey of the transaction is not the treasury / device")
         if tx.last_ledger_sequence is None:
-            raise SigningFailed("待签交易必须带 LastLedgerSequence")
+            raise SigningFailed("The transaction must include LastLedgerSequence")
         request_id = signing_requests.create(self.approval_id, self.payment_id, self._account, self._public_key,
                                              encode(tx.to_xrpl()), self.timeout_seconds)
         deadline = time.time() + self.timeout_seconds
@@ -104,10 +104,10 @@ class ExternalSigner(Signer):
             if req["status"] == signing_requests.SIGNED:
                 return req["signed_blob"]
             if req["status"] in (signing_requests.REJECTED, signing_requests.EXPIRED):
-                raise SigningFailed(req.get("error") or f"签名请求 {req['status']}")
+                raise SigningFailed(req.get("error") or f"Signing request {req['status']}")
             if time.time() > deadline:
-                signing_requests._finish(request_id, signing_requests.EXPIRED, error="等待设备签名超时")
-                raise SigningFailed("等待设备签名超时")
+                signing_requests._finish(request_id, signing_requests.EXPIRED, error="Timed out waiting for the device signature")
+                raise SigningFailed("Timed out waiting for the device signature")
             await asyncio.sleep(self.POLL_SECONDS)
 
 
@@ -137,13 +137,13 @@ def verify_signed_blob(blob: str, expected: Transaction, signer: Signer) -> None
     """确认签好的 blob 就是我们要签的那笔交易，且签名能用该签名器的公钥验证。"""
     signed = decode(blob)
     if signed.get("SigningPubKey") != signer.public_key:
-        raise ValueError("签名公钥与签名器不一致")
+        raise ValueError("The signing public key does not match the signer")
     if _content(signed) != _content(expected.to_xrpl()):
-        raise ValueError("签名后的交易内容与待签交易不一致")
+        raise ValueError("The signed transaction differs from the unsigned one")
     unsigned = {k: v for k, v in signed.items() if k not in _SIGNATURE_FIELDS}
     if not is_valid_message(bytes.fromhex(encode_for_signing(unsigned)), bytes.fromhex(signed.get("TxnSignature", "")),
                             signer.public_key):
-        raise ValueError("签名验证不通过")
+        raise ValueError("Signature verification failed")
 
 
 def _content(tx_json: dict[str, Any]) -> dict[str, Any]:

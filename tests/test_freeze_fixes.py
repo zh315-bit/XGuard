@@ -64,7 +64,7 @@ def test_R3_approval_requires_payee_suffix(merchant, offline):
     for suffix in (None, "", "ABCD", OTHER[-5:]):
         with pytest.raises(ApprovalError) as exc:
             asyncio.run(approval_service.approve(r.approval_id, treasury, confirm_payee_suffix=suffix))
-        assert exc.value.status_code == 400 and "钓鱼" in str(exc.value)
+        assert exc.value.status_code == 400 and "phishing" in str(exc.value)
     assert treasury.calls == 0 and merchant.payment_headers == []
     assert approval_service.view(r.approval_id)["status"] == "pending"   # 输错不会消耗审批单
 

@@ -62,7 +62,7 @@ export function SpeculosScreen({ url }: { url: string }) {
           // 失败时只隐藏、不卸载：后台重试成功后 onLoad 会把失败计数清零，画面自动恢复
           <img
             src={src}
-            alt="Ledger 设备屏幕（Speculos）"
+            alt="Ledger device screen (Speculos)"
             draggable={false}
             className={failures >= 3 ? "hidden" : "w-[260px] cursor-pointer select-none rounded-2xl"}
             onPointerDown={onPointerDown}
@@ -77,13 +77,13 @@ export function SpeculosScreen({ url }: { url: string }) {
         )}
         {(!src || failures >= 3) && (
           <div className="flex h-[436px] w-[260px] items-center justify-center p-6 text-center text-xs text-slate-500">
-            暂时连不上 Speculos（{base}），每 2 秒重试中…
-            <br />一直连不上的话运行 scripts/start_speculos.sh
+            Cannot reach Speculos ({base}); retrying every 2 s…
+            <br />If this persists, run scripts/start_speculos.sh
           </div>
         )}
       </div>
       <p className="text-xs text-slate-500">
-        {hasButtons ? "用下方按钮操作设备" : "点击 = 轻触屏幕，按住不放 = 长按签名"}
+        {hasButtons ? "Use the buttons below to operate the device" : "Click = tap the screen, press and hold = hold to sign"}
       </p>
       {src && hasButtons && (
         <div className="flex gap-2">

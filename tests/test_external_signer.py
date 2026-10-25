@@ -63,9 +63,9 @@ def test_device_signature_pays(merchant, offline, device):
 
 
 @pytest.mark.parametrize("tamper, message", [
-    (lambda tx: {**tx, "Destination": OTHER}, "不一致"),                  # 改收款地址
-    (lambda tx: {**tx, "Amount": "9000000"}, "不一致"),                   # 改金额
-    (lambda tx: {**tx, "Fee": "5000"}, "不一致"),                         # 改其他字段
+    (lambda tx: {**tx, "Destination": OTHER}, "differs"),                  # 改收款地址
+    (lambda tx: {**tx, "Amount": "9000000"}, "differs"),                   # 改金额
+    (lambda tx: {**tx, "Fee": "5000"}, "differs"),                         # 改其他字段
 ], ids=["destination", "amount", "fee"])
 def test_tampered_blob_rejected(merchant, offline, device, tamper, message):
     errors = []
@@ -96,7 +96,7 @@ def test_forged_signature_rejected(merchant, offline, device):
 
     _, final = run_external(merchant, device, act)
 
-    assert "签名验证不通过" in errors[0]
+    assert "Signature verification failed" in errors[0]
     assert final["payment_state"] == sm.FAILED and merchant.payment_headers == []
 
 
@@ -108,7 +108,7 @@ def test_rejected_on_device(merchant, offline, device):
 
 def test_signing_timeout_fails_safely(merchant, offline, device):
     _, final = run_external(merchant, device, lambda view: None, timeout=1.0)
-    assert final["payment_state"] == sm.FAILED and "超时" in final["reject_reason"]
+    assert final["payment_state"] == sm.FAILED and "Timed out" in final["reject_reason"]
     assert final["signing_request"]["status"] == signing_requests.EXPIRED
     assert merchant.payment_headers == []
 

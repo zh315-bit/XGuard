@@ -33,7 +33,7 @@ def lookup_tx(tx_hash: str) -> ChainStatus:
     if not resp.is_successful():
         if resp.result.get("error") == "txnNotFound":
             return ChainStatus(found=False)
-        raise RuntimeError(f"查询交易失败：{resp.result.get('error')}")
+        raise RuntimeError(f"Transaction lookup failed: {resp.result.get('error')}")
     code = resp.result.get("meta", {}).get("TransactionResult")
     validated = bool(resp.result.get("validated"))
     return ChainStatus(found=True, validated=validated, success=validated and code == "tesSUCCESS", result_code=code)
@@ -54,14 +54,14 @@ def reconcile(payment_id: int) -> dict:
             if status.success:
                 _mark_validated(row)
             else:
-                _mark_failed(row, f"交易已上链但失败：{status.result_code}")
+                _mark_failed(row, f"The transaction is on chain but failed: {status.result_code}")
         elif not status.found and latest_validated_ledger() > row["last_ledger_sequence"]:
-            _mark_failed(row, f"已超过 LastLedgerSequence {row['last_ledger_sequence']} 仍未上链，交易已失效")
+            _mark_failed(row, f"Not on chain past LastLedgerSequence {row['last_ledger_sequence']}; the transaction has expired")
         # 其余情况（未验证 / 还没到期）：保持未知，等下次对账
     except sm.IllegalTransition:
         pass   # 另一个对账者（后台清理任务 / 执行器）已经先推进了状态，以最新结果为准
     except Exception as exc:  # noqa: BLE001 —— 查链失败不能推导出任何结论
-        with_error = (row.get("error") or "") + f"；对账查询失败：{exc}"
+        with_error = (row.get("error") or "") + f"; reconciliation lookup failed: {exc}"
         payments.set_error(payment_id, with_error)
     return payments.get(payment_id)
 
@@ -78,7 +78,7 @@ def _mark_validated(row: dict) -> None:
         escrow.mark_locked(row["id"])
         escrow.deliver_and_verify(row["id"])
         return
-    sm.advance(row["id"], sm.VALIDATED, error="链上已确认，但商户的资源响应丢失，资源未送达")
+    sm.advance(row["id"], sm.VALIDATED, error="Confirmed on chain, but the merchant's response was lost; resource not delivered")
     budget.spend(row["id"])
     if row.get("decision_id"):
         # 按实际付款方记账：人工批准的是金库付款，自动付款才是热钱包

@@ -80,7 +80,7 @@ def test_gives_up_after_two_retries(fake_api):
     fake_api.outcomes = [timeout_error(), timeout_error(), timeout_error(), "never"]
     with pytest.raises(llm.LLMUnavailable) as exc:
         llm.create_message("delivery_verifier", model="m")
-    assert fake_api.calls == 3 and exc.value.kind == "timeout" and "已重试 2 次" in str(exc.value)
+    assert fake_api.calls == 3 and exc.value.kind == "timeout" and "retried 2 time(s)" in str(exc.value)
     assert (llm.recent()[0]["ok"], llm.recent()[0]["kind"]) == (False, "timeout")
 
 
@@ -106,7 +106,7 @@ def test_verifier_failure_reason_names_the_cause(fake_api, monkeypatch):
     delivery = {"dataset": "x", "week": "w", "unit": "XRP",
                 "daily": [{"date": f"2026-10-{d:02d}", "volume_xrp": d} for d in range(1, 8)]}
     result = delivery_verifier.verify("desc", {"required": ["dataset"]}, delivery)
-    assert result["verdict"] == "fail" and "请求超时，已重试 2 次" in result["reason"]
+    assert result["verdict"] == "fail" and "request timed out, retried 2 time(s)" in result["reason"]
 
 
 # ---- 状态灯 ----
@@ -119,7 +119,7 @@ def test_status_endpoint(fake_api, monkeypatch):
 
     assert client.post("/api/llm/events", json={"ok": False, "kind": "network", "detail": "ReadError"}).status_code == 200
     status = client.get("/api/llm/status").json()
-    assert status["ok"] is False and "agent" in status["reason"] and "网络连接中断" in status["reason"]
+    assert status["ok"] is False and "agent" in status["reason"] and "network connection dropped" in status["reason"]
 
     client.post("/api/llm/events", json={"ok": True})
     assert client.get("/api/llm/status").json()["ok"] is True
@@ -223,8 +223,8 @@ def test_agent_progress_summary():
         ("wait_for_approval", {"approval_id": 29}, {"status": "delivery_rejected", "reason": "验货不通过"}),
     ]
     summary = reporter.progress_summary()
-    assert "`http://m/data/a`：paid，交易 ABCDEF123456…" in summary
-    assert "`审批单 #29`：delivery_rejected，验货不通过" in summary and "list_data_sources" not in summary
+    assert "`http://m/data/a`: paid, tx ABCDEF123456…" in summary
+    assert "`approval #29`: delivery_rejected, 验货不通过" in summary and "list_data_sources" not in summary
 
 
 def test_slow_but_alive_stream_is_not_a_timeout(fake_api, monkeypatch):

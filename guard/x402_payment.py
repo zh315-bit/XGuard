@@ -76,21 +76,21 @@ def payment_header(req: PaymentRequirements, signed_blob: str, resource: Optiona
 
 def _check_supported(req: PaymentRequirements) -> None:
     if req.scheme != "exact" or req.asset != "XRP":
-        raise ValueError(f"只支持 exact + XRP，收到 {req.scheme} / {req.asset}")
+        raise ValueError(f"Only exact + XRP is supported, got {req.scheme} / {req.asset}")
     if not req.invoice_id():
-        raise ValueError("报价缺少 extra.invoiceId")
+        raise ValueError("The quote is missing extra.invoiceId")
     if (req.extra or {}).get("facilitator"):
         # prepare_payment 此时会追加一个 facilitator memo；演示商户不用，先不实现
-        raise ValueError("暂不支持带 extra.facilitator 的报价")
+        raise ValueError("Quotes with extra.facilitator are not supported yet")
 
 
 def _check_network_and_fee(req: PaymentRequirements, filled: Payment) -> None:
     info = get_client().request(ServerInfo()).result.get("info", {})
     expected = int(req.network.split(":")[1])
     if info.get("network_id") != expected:
-        raise ValueError(f"RPC 节点网络 {info.get('network_id')} 与报价网络 {req.network} 不一致")
+        raise ValueError(f"RPC node network {info.get('network_id')} does not match the quote network {req.network}")
     if not 1 <= int(filled.fee) <= MAX_FEE_DROPS:
-        raise ValueError(f"手续费 {filled.fee} drops 超过上限 {MAX_FEE_DROPS}")
+        raise ValueError(f"Fee {filled.fee} drops exceeds the limit of {MAX_FEE_DROPS}")
 
 
 def _opt_int(value: Any) -> Optional[int]:

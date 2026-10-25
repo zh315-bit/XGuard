@@ -12,19 +12,19 @@ APPROVE_HINT = f"cd {ROOT} && .venv/bin/python scripts/approve.py approve {{appr
 _NEXT_STEP = {
     "paid": None,
     "free": None,
-    "pending_approval": "调用 wait_for_approval(approval_id) 等待人工审批；不要重新请求",
-    "denied": "不要重试这个 URL；向用户说明原因，换别的数据源或跳过",
-    "rejected": "审批被拒绝：换别的数据源或跳过",
-    "expired": "报价已过期：如果仍需要这份数据，用新的 request_id 重新请求",
-    "fetch_failed": "请求资源失败，没有付款，也没有拿到数据（error 是失败原因，不是数据内容）。可以用新的 request_id 重试一次，仍失败就换数据源或跳过",
-    "payment_failed": "付款没有完成（钱没有付出去）：可以用新的 request_id 重试一次，仍失败就跳过",
-    "settlement_unknown": "付款结果暂时未知：不要用新的 request_id 重买；稍后用同一个 request_id 再调用查询结果",
-    "paid_resource_missing": "已付款但资源未送达：告诉用户，不要重新购买",
-    "in_progress": "这个 request_id 正在处理中：稍后用同一个 request_id 再查询",
-    "escrow_in_progress": "钱已锁在 escrow 里，正在取货和验货：稍后用同一个 request_id 再查询",
-    "delivery_rejected": "验货不通过：钱锁在 escrow 里，到期自动退回金库，不会付给商户。向用户说明原因，换别的数据源",
-    "refunded": "验货不通过，钱已退回金库。向用户说明原因，换别的数据源",
-    "error": "请求参数有误，见 reason",
+    "pending_approval": "Call wait_for_approval(approval_id) to wait for human approval; do not request again",
+    "denied": "Do not retry this URL; tell the user why and use another source or skip it",
+    "rejected": "The approval was rejected: use another source or skip it",
+    "expired": "The quote expired: if you still need this data, request it again with a new request_id",
+    "fetch_failed": "Fetching the resource failed: nothing was paid and no data was received (error is the reason, not data). You may retry once with a new request_id; if it fails again, use another source or skip it",
+    "payment_failed": "The payment did not complete (no money left the wallet): you may retry once with a new request_id; skip it if it fails again",
+    "settlement_unknown": "The payment outcome is not known yet: do not buy again with a new request_id; call again later with the same request_id",
+    "paid_resource_missing": "Paid but the resource was not delivered: tell the user and do not buy again",
+    "in_progress": "This request_id is still being processed: check again later with the same request_id",
+    "escrow_in_progress": "Funds are locked in escrow while the data is fetched and verified: check again later with the same request_id",
+    "delivery_rejected": "Verification failed: the funds stay in escrow and return to the treasury on expiry; the merchant is not paid. Tell the user why and use another source",
+    "refunded": "Verification failed and the funds were refunded to the treasury. Tell the user why and use another source",
+    "error": "Invalid request; see reason",
 }
 
 
@@ -102,7 +102,7 @@ def approval_for_agent(view: dict[str, Any]) -> dict[str, Any]:
                        next_step=_NEXT_STEP["delivery_rejected"])
         else:
             out.update(error=view.get("payment_error"),
-                       next_step="已批准但付款没有完成，结果见 payment_state；不要重新购买")
+                       next_step="Approved but the payment did not complete; see payment_state. Do not buy again")
     else:
         out.update(reason=view.get("reject_reason"), next_step=_NEXT_STEP.get(status))
     return out

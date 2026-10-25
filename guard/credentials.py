@@ -47,12 +47,12 @@ def fetch_credential(subject: str, issuer: str, credential_type: str) -> Optiona
     try:
         response = get_client().request(request)
     except Exception as exc:  # httpx 等网络异常类型不固定
-        raise CredentialLookupError(f"凭证查询网络错误：{exc}") from exc
+        raise CredentialLookupError(f"Network error during credential lookup: {exc}") from exc
     if response.is_successful():
         return response.result["node"]
     if response.result.get("error") == "entryNotFound":
         return None
-    raise CredentialLookupError(f"凭证查询失败：{response.result.get('error')}")
+    raise CredentialLookupError(f"Credential lookup failed: {response.result.get('error')}")
 
 
 def clear_cache() -> None:

@@ -48,12 +48,12 @@ const STATE_STYLE: Record<string, string> = {
 };
 
 const STATE_TEXT: Record<string, string> = {
-  RECEIVED: "已收到", QUOTED: "已拿到报价", EVALUATED: "已判定", DENIED: "已拒绝，未付款",
-  PENDING_APPROVAL: "等待人工确认", RESERVED: "已预留预算", SIGNING: "签名中", SUBMITTED: "已提交上链",
-  VALIDATED: "已上链确认", RESOURCE_DELIVERED: "已付款并拿到数据", EXPIRED: "审批已过期，未付款",
-  REJECTED: "人工拒绝，未付款", FAILED: "失败", UNKNOWN_SETTLEMENT: "付款结果待核对",
-  ESCROW_LOCKED: "已锁款托管", DELIVERY_RECEIVED: "已收货，验货中", REFUND_PENDING: "验货不合格，等待退款",
-  REFUNDED: "已退款",
+  RECEIVED: "Received", QUOTED: "Quoted", EVALUATED: "Evaluated", DENIED: "Denied, not paid",
+  PENDING_APPROVAL: "Awaiting approval", RESERVED: "Budget reserved", SIGNING: "Signing", SUBMITTED: "Submitted",
+  VALIDATED: "Validated on chain", RESOURCE_DELIVERED: "Paid, data received", EXPIRED: "Approval expired, not paid",
+  REJECTED: "Rejected, not paid", FAILED: "Failed", UNKNOWN_SETTLEMENT: "Settlement being reconciled",
+  ESCROW_LOCKED: "Locked in escrow", DELIVERY_RECEIVED: "Delivered, verifying", REFUND_PENDING: "Verification failed, refund pending",
+  REFUNDED: "Refunded",
 };
 
 export function StateText({ state }: { state?: string }) {
@@ -80,7 +80,7 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function ErrorLine({ error }: { error?: string }) {
   if (!error) return null;
-  return <div className="rounded-md bg-rose-500/10 px-3 py-2 text-xs text-rose-300">后端不可达：{error}</div>;
+  return <div className="rounded-md bg-rose-500/10 px-3 py-2 text-xs text-rose-300">Backend unreachable: {error}</div>;
 }
 
 export function short(address?: string, n = 6) {
@@ -102,11 +102,11 @@ export function RiskBlock({ risk }: { risk?: { risk_summary: string; supporting_
   return (
     <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-slate-300">风险解释</span>
+        <span className="text-xs font-semibold text-slate-300">Risk explanation</span>
         <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-400">
-          {risk.source === "llm" ? "LLM" : "规则模板"}
+          {risk.source === "llm" ? "LLM" : "Rule template"}
         </span>
-        <span className="text-[10px] text-slate-600">只读，不影响判定</span>
+        <span className="text-[10px] text-slate-600">Read-only, does not affect the verdict</span>
       </div>
       <p className="text-sm leading-6 text-slate-200">{risk.risk_summary}</p>
       <ul className="list-disc space-y-0.5 pl-5 text-xs text-slate-400">
@@ -114,7 +114,7 @@ export function RiskBlock({ risk }: { risk?: { risk_summary: string; supporting_
       </ul>
       {risk.suggested_review_questions.length > 0 && (
         <div className="pt-1">
-          <div className="text-xs font-medium text-slate-400">审批前建议核实</div>
+          <div className="text-xs font-medium text-slate-400">Check before approving</div>
           <ul className="mt-1 space-y-0.5 text-xs text-slate-300">
             {risk.suggested_review_questions.map((q, i) => <li key={i}>？{q}</li>)}
           </ul>
@@ -126,7 +126,7 @@ export function RiskBlock({ risk }: { risk?: { risk_summary: string; supporting_
 
 export function timeAgo(ts: number) {
   const s = Math.max(0, Math.round(Date.now() / 1000 - ts));
-  if (s < 60) return `${s} 秒前`;
-  if (s < 3600) return `${Math.round(s / 60)} 分钟前`;
-  return `${Math.round(s / 3600)} 小时前`;
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  return `${Math.round(s / 3600)} h ago`;
 }

@@ -29,7 +29,7 @@ export type DeviceStatus = (message: string) => void;
 export function modelFromName(name: string): DeviceModelId {
   const key = name.replace(/[_\s-]/g, "").toLowerCase();
   const match = Object.values(DeviceModelId).find((v) => v.toLowerCase() === key);
-  if (!match) throw new Error(`未知设备型号 ${name}，可选：${Object.values(DeviceModelId).join(", ")}`);
+  if (!match) throw new Error(`Unknown device model ${name}; options: ${Object.values(DeviceModelId).join(", ")}`);
   return match;
 }
 
@@ -58,7 +58,7 @@ export class LedgerDevice {
   /** 输入：未签名交易的 encode(tx) hex（SigningPubKey 已设为设备公钥）。输出：DER 签名的大写 hex。 */
   async signTransaction(unsignedTxHex: string, onStatus?: DeviceStatus): Promise<string> {
     const bytes = hexaStringToBuffer(unsignedTxHex);
-    if (!bytes) throw new Error("未签名交易不是合法的 hex");
+    if (!bytes) throw new Error("The unsigned transaction is not valid hex");
     const signature = await run(this.signer.signTransaction(DERIVATION_PATH, bytes), onStatus);
     return bufferToHexaString(signature, false).toUpperCase();
   }
@@ -70,10 +70,10 @@ export class LedgerDevice {
 }
 
 const INTERACTION_TEXT: Record<string, string> = {
-  UnlockDevice: "请解锁设备",
-  ConfirmOpenApp: "请在设备上确认打开 XRP 应用",
-  SignTransaction: "请在设备屏幕上核对收款地址和金额，然后长按确认签名",
-  VerifyAddress: "请在设备上核对地址",
+  UnlockDevice: "Unlock the device",
+  ConfirmOpenApp: "Confirm opening the XRP app on the device",
+  SignTransaction: "Check the payee and amount on the device screen, then hold to sign",
+  VerifyAddress: "Verify the address on the device",
 };
 
 /** 把 DMK 的 device action（observable）变成 Promise；pending 时把需要用户做的事回调出去。 */
@@ -100,7 +100,7 @@ function run<O, E, I extends { requiredUserInteraction?: unknown }>(
             reject(new Error(describeError(state.error)));
             break;
           case DeviceActionStatus.Stopped:
-            reject(new Error("设备操作被取消"));
+            reject(new Error("The device action was cancelled"));
             break;
         }
       },

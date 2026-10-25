@@ -45,20 +45,20 @@ def execute(payment_id: int, signer: Signer, kind: str, memo: dict[str, Any]) ->
     try:
         fresh = reprobe(row["url"], buyer=row["agent_id"])
     except (requests.RequestException, QuoteError, ValueError) as exc:
-        return _fail_before_submit(row, f"付款前重新获取报价失败：{exc}")
+        return _fail_before_submit(row, f"Re-fetching the quote before payment failed: {exc}")
 
     if fresh.terms_hash() != row["quote_hash"]:
         return _deny(row, _swap_decision(row, fresh), fresh)
     recheck = evaluation.decide(fresh)
     if recheck.verdict == DENY:
-        return _deny(row, Decision(DENY, recheck.rule_id, f"付款前重新判定为拒绝：{recheck.reason}"), fresh)
+        return _deny(row, Decision(DENY, recheck.rule_id, f"Re-evaluated as denied before payment: {recheck.reason}"), fresh)
 
     try:
         tx = build_payment(fresh.requirements, signer.address, signer.public_key, [decision_memo(memo)])
         blob = run_sync(signer.sign(tx))
         verify_signed_blob(blob, tx, signer)
     except Exception as exc:  # noqa: BLE001 —— 还没发出任何交易，失败是安全的
-        return _fail_before_submit(row, f"构造或签名交易失败：{exc}")
+        return _fail_before_submit(row, f"Building or signing the transaction failed: {exc}")
 
     tx_hash = Transaction.from_blob(blob).get_hash()
     # 先落库再发出：之后无论发生什么，都能按这个哈希查链
@@ -70,15 +70,15 @@ def execute(payment_id: int, signer: Signer, kind: str, memo: dict[str, Any]) ->
         resp = requests.get(row["url"], headers={"PAYMENT-SIGNATURE": header, **buyer_headers(row["agent_id"])},
                             timeout=PAY_TIMEOUT)
     except requests.RequestException as exc:
-        return _unknown(payment_id, f"签名交易已发出，但没有收到商户响应：{exc}")
+        return _unknown(payment_id, f"The signed transaction was sent but the merchant did not respond: {exc}")
 
     settled_hash, settle_error = settlement_from_response(resp)
     if resp.status_code == 200 and not settle_error and settled_hash == tx_hash:
         return _delivered(row, tx_hash, body(resp), kind)
     detail = settle_error or f"HTTP {resp.status_code}：{body(resp)}"
     if settled_hash and settled_hash != tx_hash:
-        detail += f"（商户返回的交易哈希 {settled_hash} 与我们签名的 {tx_hash} 不一致）"
-    return _unknown(payment_id, f"结算结果不明：{detail}")
+        detail += f" (the merchant returned tx hash {settled_hash}, but we signed {tx_hash})"
+    return _unknown(payment_id, f"Settlement outcome unknown: {detail}")
 
 
 def reprobe(url: str, scheme: str | None = None, buyer: str | None = None) -> Quote:
@@ -86,7 +86,7 @@ def reprobe(url: str, scheme: str | None = None, buyer: str | None = None) -> Qu
     resp = requests.get(url, headers=buyer_headers(buyer) if buyer else None, timeout=PROBE_TIMEOUT,
                         allow_redirects=False)
     if resp.status_code != 402:
-        raise ValueError(f"商户返回 HTTP {resp.status_code}，不是 402")
+        raise ValueError(f"The merchant returned HTTP {resp.status_code}, not 402")
     quote = parse_402(resp)
     return (quote.with_scheme(scheme) or quote) if scheme else quote
 
@@ -95,7 +95,7 @@ def settlement_from_response(resp: requests.Response) -> tuple[str | None, str |
     """从 PAYMENT-RESPONSE 头取交易哈希；返回 (tx_hash, 错误原因)。"""
     header = resp.headers.get("PAYMENT-RESPONSE")
     if not header:
-        return None, None if resp.status_code == 200 else "缺少 PAYMENT-RESPONSE"
+        return None, None if resp.status_code == 200 else "Missing PAYMENT-RESPONSE"
     try:
         settled = decode_payment_response(header)
     except ValueError as exc:
@@ -152,7 +152,7 @@ def _fail_before_submit(row: dict, error: str) -> dict:
 
 def _deny(row: dict, decision: Decision, fresh: Quote) -> dict:
     deny_id = audit.log_decision(row["url"], row["purpose"], fresh, decision, status="denied")
-    audit.mark_aborted(row["decision_id"], f"付款前被拦截，见决策 #{deny_id}")
+    audit.mark_aborted(row["decision_id"], f"Blocked before payment; see decision #{deny_id}")
     sm.advance(row["id"], sm.DENIED, verdict=DENY, rule_id=decision.rule_id, reason=decision.reason,
                decision_id=deny_id)
     budget.release(row["id"])
@@ -161,5 +161,5 @@ def _deny(row: dict, decision: Decision, fresh: Quote) -> dict:
 
 def _swap_decision(row: dict, fresh: Quote) -> Decision:
     return Decision(DENY, "R8", (
-        f"报价在判定和付款之间被调包：{fmt_xrp(row['amount_drops'])} XRP → {row['pay_to']} "
-        f"变成 {fmt_xrp(fresh.amount_drops) if fresh.amount_drops else fresh.amount} {fresh.asset} → {fresh.pay_to}，已拒绝付款"))
+        f"The quote was swapped between evaluation and payment: {fmt_xrp(row['amount_drops'])} XRP → {row['pay_to']} "
+        f"became {fmt_xrp(fresh.amount_drops) if fresh.amount_drops else fresh.amount} {fresh.asset} → {fresh.pay_to}; payment refused"))

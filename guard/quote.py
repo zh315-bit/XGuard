@@ -132,12 +132,12 @@ def parse_402(resp: requests.Response) -> Quote:
     try:
         required = PaymentRequired.from_dict(payload)
     except (KeyError, TypeError, ValueError) as exc:
-        raise QuoteError(f"402 内容不是合法的 PaymentRequired：{exc}") from exc
+        raise QuoteError(f"The 402 body is not a valid PaymentRequired: {exc}") from exc
     if not required.accepts:
-        raise QuoteError("402 没有给出任何 accepts 报价")
+        raise QuoteError("The 402 response has no accepts entries")
     req = _select(required.accepts)
     if req.asset == "XRP" and not (req.amount.isascii() and req.amount.isdigit() and int(req.amount) > 0):
-        raise QuoteError(f"XRP 金额必须是正整数 drops，收到 {req.amount!r}")
+        raise QuoteError(f"XRP amounts must be a positive whole number of drops, got {req.amount!r}")
     return Quote(url=resp.url, requirements=req, resource=required.resource, options=tuple(required.accepts))
 
 
@@ -154,8 +154,8 @@ def _payment_required_payload(resp: requests.Response) -> dict[str, Any]:
         try:
             return json.loads(base64.b64decode(header))
         except (ValueError, TypeError) as exc:
-            raise QuoteError(f"PAYMENT-REQUIRED 头无法解码：{exc}") from exc
-    raise QuoteError("402 响应里既没有 accepts body 也没有 PAYMENT-REQUIRED 头")
+            raise QuoteError(f"Cannot decode the PAYMENT-REQUIRED header: {exc}") from exc
+    raise QuoteError("The 402 response has neither an accepts body nor a PAYMENT-REQUIRED header")
 
 
 def _select(accepts: list[PaymentRequirements]) -> PaymentRequirements:
