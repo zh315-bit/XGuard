@@ -29,9 +29,10 @@ NETWORK = require_env("X402_NETWORK")
 # x402-xrpl README 说默认注入 sourceTag=804681468，但 0.3.4 代码里默认是 None，
 # 而 testnet facilitator 会校验它（否则 verify_failed:source_tag_mismatch），所以显式传
 SOURCE_TAG = 804681468
-# facilitator 的 /settle 要等交易上链验证才返回。默认 30 秒超时，网络抖动时会超时，
-# 商户中间件随即回 409 settlement_status_unknown 不交货（钱其实已经付了）。放宽到 90 秒。
-FACILITATOR_TIMEOUT_SECONDS = 90
+# facilitator 的 /settle 要等交易上链验证才返回，正常几秒。testnet facilitator 偶尔提交上链后
+# 一直不返回：超时后中间件回 409 settlement_status_unknown，由 settle_fallback 查链确认后交货。
+# 有了兜底就不必久等，30 秒足够正常结算；超时越长，买方签完名后干等得越久。
+FACILITATOR_TIMEOUT_SECONDS = 30
 
 # path -> (收款角色, 价格 drops, 描述)
 PAID_ROUTES = {

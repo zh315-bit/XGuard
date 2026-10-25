@@ -41,7 +41,8 @@ export function flowSteps(f: Flow, details: Partial<Record<string, ReactNode>> =
     evaluate: "Policy check",
     approval: "Human approval",
     sign: hold ? "Ledger signature" : "Hot wallet auto-sign",
-    chain: "On-chain confirmation",
+    // x402 付款由商户（facilitator）提交上链、等验证后交货；补款是金库自己提交
+    chain: topup ? "On-chain confirmation" : "Merchant settles on chain",
     deliver: topup ? "Top-up received" : "Paid, data received",
     lock: "Lock on chain (EscrowCreate)",
     verify: "Receive and verify",

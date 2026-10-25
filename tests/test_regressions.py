@@ -50,10 +50,13 @@ def test_settlement_unknown_409_is_never_reported_as_paid(merchant, offline, cha
     assert audit_rows[r.decision_id]["status"] == ("approved_paid" if approved else "paid")
 
 
-def test_demo_merchant_waits_long_enough_for_settlement():
-    """facilitator /settle 要等上链；默认 30 秒在网络抖动时不够，演示商户放宽了超时。"""
-    from merchants import demo
-    assert demo.FACILITATOR_TIMEOUT_SECONDS >= 60
+def test_demo_merchant_settlement_timeouts_fit_buyer_wait():
+    """facilitator 不返回时商户等满超时再查链兜底；整个过程必须在买方的付款请求超时之前结束，
+    且超时不能太长，否则签完名后要干等。"""
+    from guard import payment_executor
+    from merchants import demo, settle_fallback
+    assert 20 <= demo.FACILITATOR_TIMEOUT_SECONDS <= 30
+    assert demo.FACILITATOR_TIMEOUT_SECONDS + settle_fallback.CHAIN_WAIT_SECONDS < payment_executor.PAY_TIMEOUT
 
 
 def test_escrow_card_shows_failed_when_signing_fails(merchant, offline, fake_chain, tmp_path, monkeypatch):

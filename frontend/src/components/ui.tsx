@@ -49,7 +49,7 @@ const STATE_STYLE: Record<string, string> = {
 
 const STATE_TEXT: Record<string, string> = {
   RECEIVED: "Received", QUOTED: "Quoted", EVALUATED: "Evaluated", DENIED: "Denied, not paid",
-  PENDING_APPROVAL: "Awaiting approval", RESERVED: "Budget reserved", SIGNING: "Signing", SUBMITTED: "Submitted",
+  PENDING_APPROVAL: "Awaiting approval", RESERVED: "Budget reserved", SIGNING: "Signing", SUBMITTED: "Settling on chain",
   VALIDATED: "Validated on chain", RESOURCE_DELIVERED: "Paid, data received", EXPIRED: "Approval expired, not paid",
   REJECTED: "Rejected, not paid", FAILED: "Failed", UNKNOWN_SETTLEMENT: "Settlement being reconciled",
   ESCROW_LOCKED: "Locked in escrow", DELIVERY_RECEIVED: "Delivered, verifying", REFUND_PENDING: "Verification failed, refund pending",

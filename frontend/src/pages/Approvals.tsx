@@ -214,7 +214,7 @@ function ApprovalBody({ approval: a, config, onDone }: { approval: Approval; con
     setConfirming(false);
     try {
       await approveWithLedger(a, config, setStatus, confirmSuffix);
-      setStatus("Submitted, waiting for on-chain confirmation…");
+      setStatus("Signed, waiting for the merchant to settle on chain…");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStatus(undefined);
@@ -300,7 +300,11 @@ function ApprovalBody({ approval: a, config, onDone }: { approval: Approval; con
       )}
 
       {processing ? (
-        <div className="text-sm text-sky-300">Signed; payment in progress (on chain / delivery / verification). It moves to “History” when done…</div>
+        <div className="text-sm text-sky-300">
+          {a.method === "escrow"
+            ? "Signed; locking funds on chain, then the merchant delivers and the guard verifies the data. It moves to “History” when done…"
+            : "Signed; the merchant is submitting the transaction and waiting for the ledger to validate it before delivering the data. This usually takes a few seconds; if the testnet facilitator does not respond, the merchant confirms the payment on chain itself after about 30 s. It moves to “History” when done…"}
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
           <button
