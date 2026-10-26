@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>XGuard Intro</title>
+<style>
+:root{
+  --bg:#050a18; --sky:#38bdf8; --blue:#3b82f6; --cyan:#22d3ee;
+  --em:#34d399; --amb:#fbbf24; --rose:#fb7185;
+  --txt:#e8eef8; --mut:#8fa3c2; --card:rgba(14,24,48,.78); --line:rgba(130,170,230,.18);
+  --mono:"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,"SF Pro Display","PingFang SC","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden}
+.abs{position:absolute}
+
+/* ---------- 通用动画（全部以全局时间 --d 为起点，录制时用 WAAPI 逐帧 seek） ---------- */
+.up{animation:up .8s cubic-bezier(.2,.8,.2,1) var(--d) both}
+.left{animation:left .9s cubic-bezier(.2,.8,.2,1) var(--d) both}
+.right{animation:right .9s cubic-bezier(.2,.8,.2,1) var(--d) both}
+.pop{animation:pop .7s cubic-bezier(.34,1.56,.64,1) var(--d) both}
+.fade{animation:fade .6s ease var(--d) both}
+.blurin{animation:blurin 1s cubic-bezier(.2,.8,.2,1) var(--d) both}
+.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw var(--dur,1.1s) cubic-bezier(.6,0,.2,1) var(--d) forwards}
+@keyframes up{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+@keyframes left{from{opacity:0;transform:translateX(-90px)}to{opacity:1;transform:none}}
+@keyframes right{from{opacity:0;transform:translateX(90px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes fadeout{from{opacity:1}to{opacity:0}}
+@keyframes blurin{from{opacity:0;filter:blur(18px);transform:scale(1.15)}to{opacity:1;filter:none;transform:none}}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+.scene{position:absolute;inset:0;opacity:0;
+  animation:sIn .7s cubic-bezier(.2,.8,.2,1) var(--s) both, sOut .6s ease-in var(--e) forwards}
+@keyframes sIn{from{opacity:0;transform:scale(1.035);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
+@keyframes sOut{from{opacity:1;transform:none;filter:none}to{opacity:0;transform:scale(.97);filter:blur(10px)}}
+
+/* ---------- 背景 ---------- */
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55}
+.b1{width:900px;height:900px;left:-200px;top:-300px;background:radial-gradient(circle,#1d4ed8 0%,transparent 65%);animation:drift1 14s ease-in-out infinite alternate}
+.b2{width:1000px;height:1000px;right:-300px;bottom:-400px;background:radial-gradient(circle,#0e7490 0%,transparent 65%);animation:drift2 17s ease-in-out infinite alternate}
+.b3{width:700px;height:700px;left:600px;top:200px;background:radial-gradient(circle,#4338ca 0%,transparent 65%);opacity:.25;animation:drift1 11s ease-in-out -4s infinite alternate}
+@keyframes drift1{to{transform:translate(260px,180px) scale(1.15)}}
+@keyframes drift2{to{transform:translate(-240px,-160px) scale(.9)}}
+.grid{position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:80px 80px;opacity:.35;-webkit-mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 75%)}
+.floor{position:absolute;left:-50%;width:200%;bottom:-260px;height:720px;transform:perspective(520px) rotateX(72deg);
+  background-image:linear-gradient(rgba(56,189,248,.35) 2px,transparent 2px),linear-gradient(90deg,rgba(56,189,248,.35) 2px,transparent 2px);
+  background-size:90px 90px;animation:floor 2.4s linear infinite;-webkit-mask-image:linear-gradient(to top,#000 10%,transparent 80%);opacity:.5}
+@keyframes floor{to{background-position:0 90px}}
+.pt{position:absolute;border-radius:50%;background:#7dd3fc;box-shadow:0 0 12px #38bdf8;animation:ptf linear infinite}
+@keyframes ptf{from{transform:translateY(0);opacity:0}15%{opacity:.9}85%{opacity:.9}to{transform:translateY(-420px);opacity:0}}
+
+/* ---------- HUD ---------- */
+.hud{position:absolute;left:56px;top:40px;display:flex;align-items:center;gap:14px;z-index:20;
+  animation:fade .6s ease 5.6s both, fadeout .5s ease 56.8s forwards}
+.hud img{width:46px;height:46px;border-radius:12px}
+.hud b{font-size:22px;letter-spacing:.02em}
+.hud span{font-size:15px;color:var(--mut)}
+.bar{position:absolute;left:0;bottom:0;height:5px;width:100%;transform-origin:left;z-index:20;
+  background:linear-gradient(90deg,#38bdf8,#818cf8,#34d399);animation:bar 63s linear 0s both}
+@keyframes bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* ---------- 排版组件 ---------- */
+.head{position:absolute;left:120px;top:118px;width:1680px}
+.kicker{font-size:21px;font-weight:700;letter-spacing:.22em;color:var(--sky);text-transform:uppercase}
+.kicker i{font-style:normal;display:inline-block;padding:4px 12px;margin-right:16px;border-radius:8px;background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.35);letter-spacing:.05em}
+h1{margin:14px 0 0;font-size:62px;line-height:1.1;font-weight:760;letter-spacing:-.01em}
+.zh{margin-top:14px;font-size:27px;color:var(--mut)}
+.grad{background:linear-gradient(90deg,#7dd3fc,#a5b4fc 55%,#6ee7b7);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:var(--card);border:1px solid rgba(140,180,240,.22);border-radius:22px;box-shadow:0 30px 80px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);backdrop-filter:blur(10px)}
+.chip{display:inline-flex;align-items:center;gap:10px;padding:10px 20px;border-radius:999px;font-size:21px;font-weight:600;
+  background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:#cfe9ff;white-space:nowrap}
+.mono{font-family:var(--mono)}
+.g{color:var(--em)} .a{color:var(--amb)} .r{color:var(--rose)} .s{color:var(--sky)}
+.pill{display:inline-block;padding:6px 14px;border-radius:10px;font-size:18px;font-weight:800;letter-spacing:.06em}
+.pill.g{background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.45)}
+.pill.a{background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.5)}
+.pill.r{background:rgba(251,113,133,.15);border:1px solid rgba(251,113,133,.5)}
+.pill.s{background:rgba(56,189,248,.15);border:1px solid rgba(56,189,248,.5)}
+
+/* ---------- S1 ---------- */
+.ring{position:absolute;left:960px;top:360px;width:260px;height:260px;margin:-130px 0 0 -130px;border-radius:50%;
+  border:2px solid rgba(56,189,248,.6);animation:ring 2.6s cubic-bezier(.2,.6,.3,1) infinite;opacity:0}
+@keyframes ring{from{transform:scale(.7);opacity:.8}to{transform:scale(2.6);opacity:0}}
+.float{animation:float 4s ease-in-out infinite alternate}
+@keyframes float{from{transform:translateY(-8px)}to{transform:translateY(8px)}}
+.logoBig{width:230px;height:230px;border-radius:52px;box-shadow:0 0 0 1px rgba(255,255,255,.2),0 30px 90px rgba(56,189,248,.45)}
+.title{font-size:150px;font-weight:850;letter-spacing:-.02em;line-height:1}
+.title span{display:inline-block;animation:let .9s cubic-bezier(.2,.8,.2,1) var(--d) both}
+@keyframes let{from{opacity:0;transform:translateY(60px) rotateX(70deg);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
+.shine{position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);
+  background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 1.4s ease 2.2s both}
+@keyframes shine{from{background-position:120% 0}to{background-position:-60% 0}}
+
+/* ---------- S2 ---------- */
+.node{position:absolute;display:flex;flex-direction:column;align-items:center;gap:14px;font-size:24px;font-weight:650}
+.disc{width:200px;height:200px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#1e3a8a,#0b1530);
+  border:2px solid rgba(56,189,248,.45);box-shadow:0 0 60px rgba(56,189,248,.35)}
+.disc.bad{background:radial-gradient(circle at 35% 30%,#7f1d1d,#1a0b14);border-color:rgba(251,113,133,.55);box-shadow:0 0 60px rgba(251,113,133,.35)}
+.threat{position:absolute;padding:14px 22px;border-radius:16px;font-size:23px;font-weight:700;background:rgba(80,10,25,.75);
+  border:1px solid rgba(251,113,133,.55);color:#ffd0d8;box-shadow:0 12px 40px rgba(251,113,133,.25);white-space:nowrap}
+.threat small{display:block;font-size:18px;font-weight:500;color:#fca5b5;margin-top:4px}
+.glitch{animation:glitch .5s steps(2) var(--d) both}
+@keyframes glitch{0%{transform:translate(0)}20%{transform:translate(-8px,3px)}40%{transform:translate(7px,-4px)}60%{transform:translate(-5px,-2px)}80%{transform:translate(6px,3px)}100%{transform:none}}
+.coin{position:absolute;left:0;top:0;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#bae6fd,#0284c7);box-shadow:0 0 20px rgba(56,189,248,.8);
+  display:grid;place-items:center;font-weight:900;color:#06233a;font-size:20px;opacity:0;animation:coin 1.3s cubic-bezier(.5,0,.5,1) infinite}
+@keyframes coin{0%{transform:translate(300px,800px) scale(.6);opacity:0}10%{opacity:1}50%{transform:translate(960px,600px) scale(1.15)}90%{opacity:1}100%{transform:translate(1620px,540px) scale(.6);opacity:0}}
+.dash{stroke-dasharray:14 12;animation:dashmove 1s linear infinite}
+@keyframes dashmove{to{stroke-dashoffset:-26}}
+
+/* ---------- S3 ---------- */
+.branch{position:absolute;left:1360px;width:440px;height:140px;margin-top:-70px;padding:22px 28px;border-radius:20px}
+.branch b{display:block;font-size:34px;font-weight:800;letter-spacing:.02em}
+.branch span{display:block;margin-top:8px;font-size:21px;color:#c9d6ea}
+.branch.g{background:linear-gradient(135deg,rgba(16,185,129,.22),rgba(6,40,40,.7));border:1px solid rgba(52,211,153,.55);box-shadow:0 0 50px rgba(52,211,153,.18)}
+.branch.a{background:linear-gradient(135deg,rgba(245,158,11,.22),rgba(50,32,6,.7));border:1px solid rgba(251,191,36,.55);box-shadow:0 0 50px rgba(251,191,36,.18)}
+.branch.r{background:linear-gradient(135deg,rgba(244,63,94,.22),rgba(50,8,20,.7));border:1px solid rgba(251,113,133,.55);box-shadow:0 0 50px rgba(251,113,133,.18)}
+.pk{position:absolute;left:0;top:0;width:18px;height:18px;border-radius:50%;offset-rotate:0deg;opacity:0;animation:pk var(--pd,1.6s) cubic-bezier(.45,0,.55,1) infinite}
+@keyframes pk{0%{offset-distance:0%;opacity:0}12%{opacity:1}88%{opacity:1}100%{offset-distance:100%;opacity:0}}
+.guardGlow{position:absolute;left:900px;top:620px;width:420px;height:420px;margin:-210px 0 0 -210px;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent,rgba(56,189,248,.55),transparent 40%,rgba(129,140,248,.5),transparent 75%);
+  -webkit-mask:radial-gradient(circle,transparent 58%,#000 59%,#000 62%,transparent 63%);animation:spin 5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- S4 ---------- */
+.code{font-family:var(--mono);font-size:25px;line-height:1.62}
+.code div{white-space:pre}
+.code .k{color:#c4b5fd}.code .str{color:#86efac}.code .num{color:#fcd34d}.code .c{color:#64748b}.code .p{color:#7dd3fc}
+.scan{position:absolute;left:0;right:0;height:120px;background:linear-gradient(to bottom,transparent,rgba(56,189,248,.22),transparent);
+  border-bottom:2px solid rgba(56,189,248,.8);animation:scan 2s ease-in-out infinite alternate}
+@keyframes scan{from{top:-60px}to{top:500px}}
+.rule{position:absolute;left:0;width:920px;height:62px;display:flex;align-items:center;gap:18px;padding:0 20px;border-radius:14px;
+  background:rgba(14,24,48,.72);border:1px solid rgba(140,180,240,.18)}
+.rule .id{width:58px;font-family:var(--mono);font-weight:800;font-size:22px;color:var(--sky)}
+.rule .nm{width:420px;font-size:23px;font-weight:650}
+.rule .nm em{font-style:normal;color:var(--mut);font-weight:500;font-size:19px;margin-left:8px}
+.rule .dt{flex:1;font-size:20px;color:#b9c7dd;font-family:var(--mono)}
+.rule.hot{border-color:rgba(251,191,36,.55);background:rgba(60,40,8,.6)}
+.stamp{position:absolute;font-size:130px;font-weight:900;letter-spacing:.06em;color:#fbbf24;border:10px solid #fbbf24;border-radius:24px;padding:0 34px;
+  transform:rotate(-10deg);text-shadow:0 0 40px rgba(251,191,36,.6);box-shadow:0 0 60px rgba(251,191,36,.35),inset 0 0 40px rgba(251,191,36,.25);
+  animation:stamp .55s cubic-bezier(.3,1.6,.6,1) var(--d) both;background:rgba(40,25,0,.55)}
+@keyframes stamp{from{opacity:0;transform:rotate(-10deg) scale(3)}to{opacity:1;transform:rotate(-10deg) scale(1)}}
+.shake{animation:shake .45s ease var(--d) both}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(-10px,6px)}40%{transform:translate(9px,-6px)}60%{transform:translate(-6px,4px)}80%{transform:translate(4px,-2px)}}
+
+/* ---------- S5 ---------- */
+.browser{position:absolute;border-radius:18px;overflow:hidden;background:#f8fafc;box-shadow:0 40px 120px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.15)}
+.browser .top{height:38px;background:#e2e8f0;display:flex;align-items:center;gap:9px;padding:0 16px}
+.browser .top i{width:13px;height:13px;border-radius:50%;display:block}
+.browser .top u{margin-left:18px;text-decoration:none;font-size:15px;color:#475569;background:#fff;border-radius:8px;padding:3px 16px}
+.kb{animation:kb 7s ease-in-out 28.6s both}
+@keyframes kb{from{transform:translateY(0)}to{transform:translateY(-120px)}}
+.hl{position:absolute;border:4px solid #f59e0b;border-radius:12px;box-shadow:0 0 0 9999px rgba(15,23,42,0),0 0 30px rgba(245,158,11,.8);animation:hl 1.2s ease-in-out infinite alternate}
+@keyframes hl{from{box-shadow:0 0 10px rgba(245,158,11,.5)}to{box-shadow:0 0 40px rgba(245,158,11,1)}}
+.hlLabel{position:absolute;padding:8px 16px;border-radius:10px;background:#f59e0b;color:#1c1203;font-weight:800;font-size:20px;white-space:nowrap}
+.device{position:absolute;border-radius:46px;background:linear-gradient(160deg,#2a2f3a,#0b0d12);padding:18px;box-shadow:0 40px 100px rgba(0,0,0,.6),0 0 0 2px #3a4150,0 0 80px rgba(56,189,248,.2)}
+.screen{position:relative;width:100%;height:100%;border-radius:30px;background:#fff;color:#0b0d12;overflow:hidden}
+.screen .row{padding:14px 30px;border-top:1px solid #e5e7eb}
+.screen .row small{display:block;font-size:17px;color:#6b7280}
+.screen .row b{font-size:25px;font-family:var(--mono);font-weight:700}
+.finger{position:absolute;width:86px;height:86px;border-radius:50%;background:rgba(56,189,248,.28);border:3px solid rgba(56,189,248,.8);animation:press 1s ease-in-out infinite alternate}
+@keyframes press{from{transform:scale(.9)}to{transform:scale(1.08)}}
+
+/* ---------- S6 ---------- */
+.step{position:absolute;width:300px;margin-left:-150px;text-align:center}
+.step .ic{width:110px;height:110px;margin:0 auto;border-radius:30px;display:grid;place-items:center;background:linear-gradient(145deg,#1e3a8a,#0b1530);
+  border:2px solid rgba(56,189,248,.6);box-shadow:0 0 50px rgba(56,189,248,.35)}
+.step b{display:block;margin-top:18px;font-size:30px}
+.step span{display:block;margin-top:6px;font-size:19px;color:var(--mut);line-height:1.4}
+.step span span{display:inline;margin:0}
+.barc{position:absolute;bottom:0;width:58px;border-radius:10px 10px 4px 4px;background:linear-gradient(to top,#0ea5e9,#818cf8);transform-origin:bottom;
+  animation:grow .7s cubic-bezier(.2,.8,.2,1) var(--d) both}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.chk{font-size:23px;margin:0 0 16px;display:flex;gap:14px;align-items:center}
+.chk i{font-style:normal;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(52,211,153,.18);color:var(--em);font-weight:900;font-size:19px}
+.outc{position:absolute;left:1240px;width:560px;padding:24px 30px;border-radius:20px}
+.outc b{font-size:30px;display:block}
+.outc span{font-size:20px;color:#c9d6ea;display:block;margin-top:8px}
+
+/* ---------- S7 ---------- */
+.radar{position:absolute;left:180px;top:350px;width:480px;height:480px;border-radius:50%;
+  background:radial-gradient(circle,rgba(56,189,248,.08),rgba(5,10,24,.6) 70%);border:2px solid rgba(56,189,248,.45);overflow:hidden}
+.radar .rr{position:absolute;border-radius:50%;border:1px solid rgba(56,189,248,.25)}
+.sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(56,189,248,.55),rgba(56,189,248,0) 25%,transparent);animation:spin 3s linear infinite}
+.blip{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--em);box-shadow:0 0 18px var(--em)}
+.blip.red{background:var(--rose);box-shadow:0 0 26px var(--rose);width:24px;height:24px;margin:-12px 0 0 -12px}
+.pulse{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;border:3px solid var(--rose);animation:pulse 1.1s ease-out infinite}
+@keyframes pulse{from{transform:scale(1);opacity:1}to{transform:scale(5);opacity:0}}
+.tx{position:absolute;left:0;width:1000px;height:64px;display:flex;align-items:center;gap:18px;padding:0 22px;border-radius:14px;
+  background:rgba(14,24,48,.75);border:1px solid rgba(140,180,240,.18);font-size:22px}
+.tx .ty{width:170px;font-weight:700}
+.tx .ds{flex:1;font-family:var(--mono);font-size:20px;color:#b9c7dd}
+.tx.bad{background:rgba(90,10,30,.8);border-color:rgba(251,113,133,.7);box-shadow:0 0 40px rgba(251,113,133,.35)}
+.flash{position:absolute;inset:0;background:radial-gradient(circle,rgba(244,63,94,.0),rgba(244,63,94,.45));opacity:0;animation:flash 1s ease-out var(--d) both;pointer-events:none}
+@keyframes flash{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
+.shot{position:absolute;border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.15)}
+.shot img{display:block;width:100%}
+.cursor{position:absolute;left:0;top:0;z-index:5;animation:cur 0.9s cubic-bezier(.5,0,.2,1) 49.3s both}
+@keyframes cur{from{transform:translate(1500px,1000px)}to{transform:translate(870px,729px)}}
+.ripple{position:absolute;left:872px;top:731px;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:4px solid #fff;opacity:0;animation:rip .6s ease-out 50.25s both}
+@keyframes rip{0%{opacity:1;transform:scale(.5)}100%{opacity:0;transform:scale(3.5)}}
+
+/* ---------- S8 ---------- */
+.win{position:absolute;border-radius:18px;overflow:hidden;background:rgba(8,14,30,.92);border:1px solid rgba(140,180,240,.25);box-shadow:0 40px 100px rgba(0,0,0,.55)}
+.win .top{height:44px;display:flex;align-items:center;gap:9px;padding:0 18px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06)}
+.win .top i{width:13px;height:13px;border-radius:50%;display:block}
+.win .top u{margin-left:14px;text-decoration:none;font-family:var(--mono);font-size:16px;color:var(--mut)}
+.caret{display:inline-block;width:12px;height:28px;background:#7dd3fc;vertical-align:-5px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.tool{position:absolute;width:350px;padding:16px 20px;border-radius:14px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.35);font-family:var(--mono);font-size:21px;color:#cfe9ff}
+.tool small{display:block;font-family:-apple-system,"PingFang SC",sans-serif;color:var(--mut);font-size:17px;margin-top:4px}
+
+/* ---------- S9 ---------- */
+.tile{position:absolute;width:500px;height:150px;padding:26px 30px;border-radius:22px}
+.tile b{display:block;font-size:30px}
+.tile span{display:block;margin-top:10px;font-size:20px;color:var(--mut)}
+.tiles{animation:tilesOut .6s ease-in 59.6s forwards}
+@keyframes tilesOut{to{opacity:0;transform:scale(.92);filter:blur(8px)}}
+.black{position:absolute;inset:0;background:#000;opacity:0;z-index:30;animation:fade .6s ease 62.4s both}
+
+/* ---------- 解说员 + 字幕（由旁白音量驱动） ---------- */
+.narr{position:absolute;right:56px;top:30px;display:flex;align-items:center;gap:26px;z-index:21;
+  animation:fade .6s ease 5.6s both, fadeout .5s ease 56.8s forwards}
+.nav{position:relative;width:76px;height:76px}
+.nav img{position:relative;width:76px;height:76px;border-radius:20px;box-shadow:0 0 30px rgba(56,189,248,.5)}
+.nring{position:absolute;inset:-8px;border-radius:26px;border:3px solid rgba(56,189,248,.9);box-shadow:0 0 24px rgba(56,189,248,.8);opacity:0}
+.ntxt b{display:block;font-size:22px}
+.ntxt span{display:block;font-size:14px;letter-spacing:.18em;color:var(--sky);text-transform:uppercase;margin-top:2px}
+.eq{display:flex;align-items:flex-end;gap:4px;height:30px;margin-top:6px}
+.eq i{display:block;width:5px;height:4px;border-radius:3px;background:linear-gradient(to top,#38bdf8,#a5b4fc)}
+.subs{position:absolute;left:50%;top:1000px;transform:translateX(-50%);z-index:22;display:flex;align-items:center;gap:14px;
+  max-width:1640px;padding:12px 26px 12px 14px;border-radius:999px;background:rgba(3,8,20,.78);border:1px solid rgba(140,180,240,.25);
+  box-shadow:0 10px 40px rgba(0,0,0,.5);font-size:27px;font-weight:600;white-space:nowrap;transition:none}
+.subs img{width:40px;height:40px;border-radius:11px}
+.subs .w{opacity:.38}.subs .w.on{opacity:1}
+.bubble{position:absolute;left:1080px;top:215px;padding:14px 24px;border-radius:22px 22px 22px 6px;background:#fff;color:#0b1530;font-size:30px;font-weight:800;
+  box-shadow:0 14px 40px rgba(56,189,248,.45);animation:pop .6s cubic-bezier(.34,1.56,.64,1) var(--d) both, fadeout .4s ease 4.6s forwards}
+
+/* ---------- 两个对话角色 + 气泡（内容区缩到 0.8，角色和气泡放在边缘，不遮挡内容） ---------- */
+#content{position:absolute;left:192px;top:6px;width:1920px;height:1080px;transform:scale(.8);transform-origin:0 0}
+.chrIn{position:absolute;top:788px;width:180px;height:252px;z-index:22;transform-origin:50% 100%;animation:pop .7s cubic-bezier(.34,1.56,.64,1) var(--d) both}
+.chr{display:block;width:100%;height:100%;overflow:visible}
+.bobA{animation:bob 2.6s ease-in-out infinite alternate}
+.bobB{animation:bob 2.2s ease-in-out -1s infinite alternate}
+@keyframes bob{from{transform:translateY(-4px)}to{transform:translateY(4px)}}
+.blink{transform-box:fill-box;transform-origin:center;animation:blink 4.2s linear infinite}
+.blinkB{transform-box:fill-box;transform-origin:center;animation:blink 3.6s linear -1.7s infinite}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.tag{position:absolute;top:1044px;width:180px;text-align:center;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);z-index:22}
+.tag b{color:#e8eef8;letter-spacing:.08em}
+.spot{position:absolute;top:900px;width:260px;height:200px;border-radius:50%;filter:blur(30px);opacity:0;z-index:21}
+.bub{position:absolute;top:886px;max-width:1350px;padding:14px 28px 16px;border-radius:26px;font-size:30px;font-weight:650;line-height:1.3;
+  color:#0b1530;box-shadow:0 16px 40px rgba(0,0,0,.45);z-index:23;opacity:0}
+.bub::before{content:"";position:absolute;top:30px;border:14px solid transparent}
+.bub.alex{left:216px;background:#fff;transform-origin:0 30px}
+.bub.alex::before{left:-26px;border-right-color:#fff}
+.bub.xguard{right:216px;background:#e0f2fe;transform-origin:100% 30px}
+.bub.xguard::before{right:-26px;border-left-color:#e0f2fe}
+.bub .who{font-size:15px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.bub.alex .who{color:#6366f1}.bub.xguard .who{color:#0284c7}
+.bub .w{opacity:.3}.bub .w.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- 背景 -->
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <div class="grid"></div>
+  <div class="floor"></div>
+  <div id="particles"></div>
+
+  <div id="content">
+  <div class="hud"><img src="logo.png"><div><b>XGuard</b><br><span>Payment guard for AI agents · XRPL</span></div></div>
+
+  <!-- ================= S1 开场 0–5.6 ================= -->
+  <section class="scene" style="--s:0s;--e:5s">
+    <div class="ring" style="animation-delay:.7s"></div>
+    <div class="ring" style="animation-delay:1.5s"></div>
+    <div class="ring" style="animation-delay:2.3s"></div>
+    <div class="abs" style="left:845px;top:245px"><div class="pop" style="--d:.25s"><div class="float"><div id="talk1"><img class="logoBig" src="logo.png"></div></div></div></div>
+    <div class="abs" style="left:0;width:1920px;top:520px;text-align:center">
+      <div class="title" style="position:relative;display:inline-block">
+        <span class="grad" style="--d:.9s">X</span><span style="--d:.97s">G</span><span style="--d:1.04s">u</span><span style="--d:1.11s">a</span><span style="--d:1.18s">r</span><span style="--d:1.25s">d</span>
+        <div class="shine">XGuard</div>
+      </div>
+    </div>
+    <div class="abs up" style="--d:1.9s;left:0;width:1920px;top:700px;text-align:center;font-size:40px;color:#c7d5ea">x402 lets AI agents pay.</div>
+    <div class="abs up" style="--d:2.4s;left:0;width:1920px;top:760px;text-align:center;font-size:52px;font-weight:760"><span class="grad">XGuard makes sure they don't drain your wallet.</span></div>
+    <div class="abs up" style="--d:3.0s;left:0;width:1920px;top:850px;text-align:center;font-size:29px;color:var(--mut)">A payment guard for AI agents — policy engine · human approval · hardware signing · on-chain audit</div>
+    <div class="abs" style="left:0;width:1920px;top:930px;display:flex;justify-content:center;gap:18px">
+      <div class="chip pop" style="--d:3.5s">XRPL Testnet</div><div class="chip pop" style="--d:3.62s">x402</div>
+      <div class="chip pop" style="--d:3.74s">Ledger</div><div class="chip pop" style="--d:3.86s">Quicknode</div><div class="chip pop" style="--d:3.98s">MCP</div>
+    </div>
+  </section>
+
+  <!-- ================= S2 痛点 5.4–12.2 ================= -->
+  <section class="scene" style="--s:5.4s;--e:11.6s">
+    <div class="head">
+      <div class="kicker up" style="--d:5.7s"><i>01</i>The problem</div>
+      <h1 class="up" style="--d:5.85s">Agents can pay on their own. <span class="r">Who checks the bill?</span></h1>
+      <div class="zh up" style="--d:6.05s">With x402, agents pay on their own — but the price, the payee and the data are all set by a remote server</div>
+    </div>
+    <svg class="abs" style="left:0;top:0" width="1920" height="1080">
+      <path class="dash fade" style="--d:6.6s" d="M400 540 L760 540" stroke="#38bdf8" stroke-width="3" fill="none"/>
+      <path class="dash fade" style="--d:6.6s" d="M1160 540 L1520 540" stroke="#fb7185" stroke-width="3" fill="none"/>
+    </svg>
+    <div class="node left" style="--d:6.3s;left:200px;top:430px">
+      <div class="disc"><svg width="110" height="110" viewBox="0 0 100 100"><line x1="50" y1="8" x2="50" y2="22" stroke="#7dd3fc" stroke-width="5"/><circle cx="50" cy="8" r="6" fill="#7dd3fc"/>
+        <rect x="16" y="22" width="68" height="56" rx="18" fill="#e0f2fe"/><rect x="24" y="32" width="52" height="30" rx="12" fill="#0f172a"/>
+        <circle cx="38" cy="47" r="5" fill="#38bdf8"/><circle cx="62" cy="47" r="5" fill="#38bdf8"/><rect x="34" y="84" width="32" height="10" rx="4" fill="#7dd3fc"/></svg></div>
+      AI Agent
+    </div>
+    <div class="node right" style="--d:6.3s;left:1520px;top:430px">
+      <div class="disc bad"><svg width="100" height="100" viewBox="0 0 100 100"><rect x="18" y="14" width="64" height="20" rx="5" fill="#fecdd3"/><rect x="18" y="40" width="64" height="20" rx="5" fill="#fecdd3"/><rect x="18" y="66" width="64" height="20" rx="5" fill="#fecdd3"/>
+        <circle cx="30" cy="24" r="4" fill="#e11d48"/><circle cx="30" cy="50" r="4" fill="#e11d48"/><circle cx="30" cy="76" r="4" fill="#e11d48"/></svg></div>
+      Untrusted merchant
+    </div>
+    <div class="abs pop" style="--d:6.7s;left:760px;top:400px;width:400px">
+      <div id="q402" class="card glitch" style="--d:8.0s;padding:24px 28px;border-color:rgba(251,113,133,.45)">
+        <div class="mono" style="font-size:22px;font-weight:800;color:var(--rose)">HTTP 402</div>
+        <div style="font-size:20px;color:var(--mut);margin-bottom:12px">Payment Required</div>
+        <div class="mono" style="font-size:22px;line-height:1.7">amount: <b id="amt">8 XRP</b><br>payTo: <b id="payto">rNfh4S…LCs6</b><br>asset: XRP</div>
+      </div>
+    </div>
+    <div class="threat pop" style="--d:7.0s;left:520px;top:320px">⚠ Quote swap<small>terms changed after review</small></div>
+    <div class="threat pop" style="--d:7.35s;left:1190px;top:320px">⚠ Overpricing<small>any price the server likes</small></div>
+    <div class="threat pop" style="--d:7.7s;left:540px;top:690px">⚠ Phishing payee<small>money sent to a stranger</small></div>
+    <div class="threat pop" style="--d:8.05s;left:1190px;top:690px">⚠ Garbage data<small>paid first, junk delivered</small></div>
+    <div class="abs card left" style="--d:8.4s;left:120px;top:730px;width:360px;padding:20px 26px">
+      <div style="font-size:20px;color:var(--mut)">Agent wallet balance</div>
+      <div id="bal" class="mono" style="font-size:46px;font-weight:800;margin-top:6px">100.00 XRP</div>
+    </div>
+    <div class="fade" style="--d:8.8s;position:absolute;inset:0" id="coins"></div>
+    <div class="abs up" style="--d:9.6s;left:0;width:1920px;top:930px;text-align:center;font-size:30px;font-weight:650">
+      Fully automatic → <span class="r">one bad merchant drains the wallet</span>　　Approve everything → <span class="a">no autonomy left</span>
+    </div>
+  </section>
+
+  <!-- ================= S3 方案 11.6–20.2 ================= -->
+  <section class="scene" style="--s:11.6s;--e:19.6s">
+    <div class="head">
+      <div class="kicker up" style="--d:11.9s"><i>02</i>The solution</div>
+      <h1 class="up" style="--d:12.05s">A <span class="grad">guard</span> between the agent and the money</h1>
+      <div class="zh up" style="--d:12.25s">XGuard intercepts every x402 quote and decides by policy: pay automatically, ask a human, or refuse</div>
+    </div>
+    <svg class="abs" style="left:0;top:0" width="1920" height="1080" fill="none" stroke-linecap="round">
+      <path class="draw" pathLength="1" style="--d:12.9s" d="M390 620 L790 620" stroke="#38bdf8" stroke-width="4"/>
+      <path class="draw" pathLength="1" style="--d:13.7s" d="M1010 620 C1180 620 1190 430 1360 430" stroke="#34d399" stroke-width="4"/>
+      <path class="draw" pathLength="1" style="--d:13.85s" d="M1010 620 L1360 620" stroke="#fbbf24" stroke-width="4"/>
+      <path class="draw" pathLength="1" style="--d:14.0s" d="M1010 620 C1180 620 1190 810 1360 810" stroke="#fb7185" stroke-width="4"/>
+    </svg>
+    <div class="node pop" style="--d:12.6s;left:200px;top:530px">
+      <div class="disc" style="width:180px;height:180px"><svg width="96" height="96" viewBox="0 0 100 100"><line x1="50" y1="8" x2="50" y2="22" stroke="#7dd3fc" stroke-width="5"/><circle cx="50" cy="8" r="6" fill="#7dd3fc"/>
+        <rect x="16" y="22" width="68" height="56" rx="18" fill="#e0f2fe"/><rect x="24" y="32" width="52" height="30" rx="12" fill="#0f172a"/>
+        <circle cx="38" cy="47" r="5" fill="#38bdf8"/><circle cx="62" cy="47" r="5" fill="#38bdf8"/><rect x="34" y="84" width="32" height="10" rx="4" fill="#7dd3fc"/></svg></div>
+      AI Agent
+      <span style="font-size:19px;color:var(--mut);font-weight:500">🔑✕ never holds a private key</span>
+    </div>
+    <div class="fade" style="--d:13.2s"><div class="guardGlow"></div></div>
+    <div class="abs pop" style="--d:13.1s;left:800px;top:520px"><img src="logo.png" style="width:200px;height:200px;border-radius:46px;box-shadow:0 0 80px rgba(56,189,248,.55)"></div>
+    <div class="abs up" style="--d:13.4s;left:700px;width:400px;top:760px;text-align:center;font-size:24px;font-weight:700">XGuard policy engine<div style="font-size:19px;color:var(--mut);font-weight:500;margin-top:4px">policy.yaml · reloaded on every decision</div></div>
+    <div class="branch g pop" style="--d:14.0s;top:430px"><b class="g">AUTO · pay now</b><span>≤ 1 XRP · capped hot wallet</span></div>
+    <div class="branch a pop" style="--d:14.25s;top:620px"><b class="a">HOLD · ask a human</b><span>Human review + Ledger signature</span></div>
+    <div class="branch r pop" style="--d:14.5s;top:810px"><b class="r">DENY · refuse</b><span>Blacklist · hard cap · quote swap</span></div>
+    <div class="fade" style="--d:14.6s;position:absolute;inset:0">
+      <div class="pk" style="offset-path:path('M390 620 L790 620');background:#7dd3fc;box-shadow:0 0 18px #38bdf8;animation-delay:14.6s;--pd:1.3s"></div>
+      <div class="pk" style="offset-path:path('M390 620 L790 620');background:#7dd3fc;box-shadow:0 0 18px #38bdf8;animation-delay:15.25s;--pd:1.3s"></div>
+      <div class="pk" style="offset-path:path('M1010 620 C1180 620 1190 430 1360 430');background:#34d399;box-shadow:0 0 18px #34d399;animation-delay:15.3s"></div>
+      <div class="pk" style="offset-path:path('M1010 620 L1360 620');background:#fbbf24;box-shadow:0 0 18px #fbbf24;animation-delay:15.85s"></div>
+      <div class="pk" style="offset-path:path('M1010 620 C1180 620 1190 810 1360 810');background:#fb7185;box-shadow:0 0 18px #fb7185;animation-delay:16.4s"></div>
+    </div>
+    <div class="abs" style="left:120px;width:1680px;top:930px;display:flex;gap:14px;justify-content:center;flex-wrap:nowrap">
+      <div class="chip up" style="--d:15.6s">R1 Network</div><div class="chip up" style="--d:15.72s">R2 Blacklist</div>
+      <div class="chip up" style="--d:15.84s">R3 Credential</div><div class="chip up" style="--d:15.96s">R4 Auto limit</div>
+      <div class="chip up" style="--d:16.08s">R5 Daily budget</div><div class="chip up" style="--d:16.2s">R6 Rate limit</div>
+      <div class="chip up" style="--d:16.32s">R7 Hard cap</div><div class="chip up" style="--d:16.44s">R8 Quote hash</div>
+    </div>
+  </section>
+
+  <!-- ================= S4 策略引擎 19.6–28.2 ================= -->
+  <section class="scene" style="--s:19.6s;--e:27.6s">
+    <div class="head">
+      <div class="kicker up" style="--d:19.9s"><i>03</i>Policy engine</div>
+      <h1 class="up" style="--d:20.05s">Every quote is checked <span class="grad">before money moves</span></h1>
+      <div class="zh up" style="--d:20.25s">An 8 XRP data purchase runs through every rule — money moves only after the verdict</div>
+    </div>
+    <div class="abs" style="left:120px;top:340px;width:680px;height:540px">
+      <div class="card left shake" style="--d:20.4s;position:absolute;inset:0;overflow:hidden;padding:30px 36px">
+        <div class="shake" style="--d:24.7s">
+        <div class="code">
+          <div class="c">GET /data/b  →  <span class="r" style="font-weight:800">402</span></div>
+          <div>{</div>
+          <div>  <span class="p">"scheme"</span>:  <span class="str">"exact"</span>,</div>
+          <div>  <span class="p">"network"</span>: <span class="str">"xrpl:1"</span>,</div>
+          <div>  <span class="p">"asset"</span>:   <span class="str">"XRP"</span>,</div>
+          <div>  <span class="p">"amount"</span>:  <span class="num">"8 XRP"</span>,</div>
+          <div>  <span class="p">"payTo"</span>:   <span class="str">"rNfh4S…tSLCs6"</span>,</div>
+          <div>  <span class="p">"description"</span>: <span class="str">"whale fund flows"</span></div>
+          <div>}</div>
+          <div class="c">quote_hash  9f2c…a71e  🔒</div>
+        </div>
+        </div>
+        <div class="fade" style="--d:20.9s;position:absolute;inset:0"><div class="scan"></div></div>
+      </div>
+      <div class="stamp" style="--d:24.6s;left:300px;top:330px">HOLD</div>
+    </div>
+    <div class="abs" style="left:880px;top:340px;width:920px;height:560px">
+      <div class="rule right" style="--d:20.9s;top:0"><span class="id">R1</span><span class="nm">Network &amp; asset</span><span class="dt">xrpl:1 · XRP</span><span class="pill g pop" style="--d:21.15s">PASS</span></div>
+      <div class="rule right" style="--d:21.3s;top:70px"><span class="id">R7</span><span class="nm">Hard cap</span><span class="dt">8 ≤ 50 XRP</span><span class="pill g pop" style="--d:21.55s">PASS</span></div>
+      <div class="rule right" style="--d:21.7s;top:140px"><span class="id">R2</span><span class="nm">Blacklist</span><span class="dt">payee not listed</span><span class="pill g pop" style="--d:21.95s">PASS</span></div>
+      <div class="rule right" style="--d:22.1s;top:210px"><span class="id">R3</span><span class="nm">Merchant credential</span><span class="dt">XLS-70 verified</span><span class="pill g pop" style="--d:22.35s">PASS</span></div>
+      <div class="rule hot right" style="--d:22.5s;top:280px"><span class="id">R4</span><span class="nm">Auto limit</span><span class="dt a">8 &gt; 1 XRP</span><span class="pill a pop" style="--d:22.75s">HOLD</span></div>
+      <div class="rule hot right" style="--d:22.9s;top:350px"><span class="id">R5</span><span class="nm">Daily budget</span><span class="dt a">exceeds 5 XRP/day</span><span class="pill a pop" style="--d:23.15s">HOLD</span></div>
+      <div class="rule right" style="--d:23.3s;top:420px"><span class="id">R6</span><span class="nm">Rate limit</span><span class="dt">1 / 5 per min</span><span class="pill g pop" style="--d:23.55s">PASS</span></div>
+      <div class="rule right" style="--d:23.7s;top:490px"><span class="id">R8</span><span class="nm">Quote hash</span><span class="dt">locked at approval</span><span class="pill s pop" style="--d:23.95s">BOUND</span></div>
+    </div>
+    <div class="abs up" style="--d:25.2s;left:120px;width:1680px;top:925px;font-size:26px;text-align:center">
+      <span class="a" style="font-weight:800">HOLD</span> → human approval + Ledger signature　·　<span class="s">LLM explains the risk, but cannot change the verdict</span>
+    </div>
+  </section>
+
+  <!-- ================= S5 人工审批 + Ledger 27.6–36.6 ================= -->
+  <section class="scene" style="--s:27.6s;--e:36s">
+    <div class="head">
+      <div class="kicker up" style="--d:27.9s"><i>04</i>Human in the loop</div>
+      <h1 class="up" style="--d:28.05s">Big payments wait for a human — <span class="grad">and a Ledger</span></h1>
+      <div class="zh up" style="--d:28.25s">The console explains the risk; the approver checks payee and amount on the device screen, then holds to sign</div>
+    </div>
+    <div class="abs" style="left:110px;top:320px;width:1040px;height:640px;perspective:2000px">
+      <div class="left" style="--d:28.4s;position:absolute;inset:0;transform-style:preserve-3d">
+        <div class="browser" style="inset:0;transform:rotateY(8deg)">
+          <div class="top"><i style="background:#f87171"></i><i style="background:#fbbf24"></i><i style="background:#34d399"></i><u>127.0.0.1:5173 / approvals</u></div>
+          <div style="position:relative;height:602px;overflow:hidden">
+            <div class="kb" style="position:relative">
+              <img src="approvals.png" style="width:1040px;display:block">
+              <div class="pop" style="--d:30.0s;position:absolute;left:32px;top:350px;width:542px;height:242px"><div class="hl" style="inset:0"></div>
+                <div class="hlLabel" style="right:14px;top:-24px">LLM risk explanation · read-only</div></div>
+              <div class="pop" style="--d:31.0s;position:absolute;left:32px;top:614px;width:102px;height:27px"><div class="hl" style="inset:-6px"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="device right" style="--d:28.8s;left:1290px;top:310px;width:500px;height:590px">
+      <div class="screen">
+        <div style="padding:26px 30px 12px"><div style="font-size:17px;color:#6b7280;letter-spacing:.08em">LEDGER · XRP</div><div style="font-size:30px;font-weight:800;margin-top:4px">Review transaction</div></div>
+        <div class="row"><small>Amount</small><b>8 XRP</b></div>
+        <div class="row"><small>To</small><b style="font-size:21px">rNfh4SR2sz…tSLCs6</b></div>
+        <div class="row"><small>Memo</small><b style="font-size:21px">agentguard/decision</b></div>
+        <div style="position:absolute;left:0;right:0;bottom:22px;text-align:center">
+          <svg width="110" height="110" viewBox="0 0 110 110" style="display:block;margin:0 auto">
+            <circle cx="55" cy="55" r="44" stroke="#e5e7eb" stroke-width="9" fill="none"/>
+            <circle class="draw" pathLength="1" cx="55" cy="55" r="44" stroke="#0ea5e9" stroke-width="9" fill="none" stroke-linecap="round" transform="rotate(-90 55 55)" style="--d:31.6s;--dur:2s"/>
+          </svg>
+          <div style="font-size:21px;font-weight:700;margin-top:6px">Hold to sign</div>
+          <div class="fade" style="--d:31.3s"><div class="finger" style="left:189px;top:12px"></div></div>
+        </div>
+        <div class="fade" style="--d:33.7s;position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+          <div class="pop" style="--d:33.8s;width:130px;height:130px;border-radius:50%;background:#10b981;display:grid;place-items:center;color:#fff;font-size:76px;font-weight:900;box-shadow:0 0 50px rgba(16,185,129,.6)">✓</div>
+          <div style="font-size:32px;font-weight:800">Transaction signed</div>
+          <div style="font-size:20px;color:#6b7280">Submitted to XRPL</div>
+        </div>
+      </div>
+    </div>
+    <div class="abs" style="left:1290px;top:920px;width:520px;display:flex;flex-direction:column;gap:10px;font-size:20px">
+      <div class="up" style="--d:34.2s">🔐 Master key off · Regular Key = Ledger</div>
+      <div class="up" style="--d:34.45s">🔁 Quote changed before paying → <span class="r" style="font-weight:800">DENY (R8)</span></div>
+    </div>
+  </section>
+
+  <!-- ================= S6 Escrow 36–45.2 ================= -->
+  <section class="scene" style="--s:36s;--e:44.6s">
+    <div class="head">
+      <div class="kicker up" style="--d:36.3s"><i>05</i>Verify before release</div>
+      <h1 class="up" style="--d:36.45s">Escrow: <span class="grad">lock → verify → release</span>, or refund</h1>
+      <div class="zh up" style="--d:36.65s">Large purchases skip pay-first: funds sit in a native XRPL Escrow until the delivered data passes verification</div>
+    </div>
+    <div class="abs" style="left:240px;top:400px;width:1380px;height:6px;border-radius:3px;background:rgba(140,180,240,.18)"></div>
+    <div class="abs" style="left:240px;top:400px;width:1380px;height:6px;border-radius:3px;background:linear-gradient(90deg,#38bdf8,#818cf8,#34d399);transform-origin:left;animation:bar 3.2s cubic-bezier(.4,0,.2,1) 37.1s both;box-shadow:0 0 20px #38bdf8"></div>
+    <div class="step pop" style="--d:37.0s;left:240px;top:348px"><div class="ic"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div><b>Lock</b><span>EscrowCreate · 6 XRP<br>Ledger-signed, conditional</span></div>
+    <div class="step pop" style="--d:38.05s;left:700px;top:348px"><div class="ic"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></div><b>Deliver</b><span>Merchant checks the escrow<br>on-chain, then delivers</span></div>
+    <div class="step pop" style="--d:39.1s;left:1160px;top:348px"><div class="ic"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg></div><b>Verify</b><span>Deterministic checks<br>+ LLM semantic review</span></div>
+    <div class="step pop" style="--d:40.2s;left:1620px;top:348px"><div class="ic" style="border-color:rgba(52,211,153,.7);box-shadow:0 0 50px rgba(52,211,153,.35)"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></div><b>Settle</b><span><span class="g">Finish</span> release · <span class="r">Cancel</span> refund</span></div>
+
+    <div class="abs card up" style="--d:38.6s;left:120px;top:640px;width:1060px;height:330px;padding:24px 30px">
+      <div style="font-size:21px;color:var(--mut)">Delivered data · <span class="mono s">xrpl_dex_7day · 2026-W42</span></div>
+      <div style="position:absolute;left:30px;top:80px;width:520px;height:200px">
+        <div class="barc" style="--d:39.3s;left:0;height:120px"></div><div class="barc" style="--d:39.38s;left:76px;height:160px"></div>
+        <div class="barc" style="--d:39.46s;left:152px;height:95px"></div><div class="barc" style="--d:39.54s;left:228px;height:180px"></div>
+        <div class="barc" style="--d:39.62s;left:304px;height:140px"></div><div class="barc" style="--d:39.7s;left:380px;height:70px"></div>
+        <div class="barc" style="--d:39.78s;left:456px;height:110px"></div>
+        <div class="mono" style="position:absolute;top:208px;left:0;width:520px;display:flex;justify-content:space-between;font-size:16px;color:var(--mut)"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      </div>
+      <div style="position:absolute;left:600px;top:74px">
+        <div class="chk right" style="--d:39.7s"><i>✓</i>7 consecutive days in W42</div>
+        <div class="chk right" style="--d:39.95s"><i>✓</i>unit = XRP · values ≥ 0</div>
+        <div class="chk right" style="--d:40.2s"><i>✓</i>total = sum of days</div>
+        <div class="chk right" style="--d:40.45s"><i>✓</i>LLM semantic check</div>
+      </div>
+    </div>
+    <div class="outc branch g pop" style="--d:41.4s;top:640px;height:auto;margin:0"><b class="g">✓ Good data → Released</b><span>EscrowFinish · verdict hash in the Memo</span></div>
+    <div class="outc branch r pop" style="--d:42.1s;top:815px;height:auto;margin:0"><b class="r">↩ Garbage data → Refunded</b><span>Stale 2019 data · EscrowCancel to treasury</span></div>
+  </section>
+
+  <!-- ================= S7 哨兵 + Contain 44.6–52.6 ================= -->
+  <section class="scene" style="--s:44.6s;--e:52s">
+    <div class="head">
+      <div class="kicker up" style="--d:44.9s"><i>06</i>Independent sentinel</div>
+      <h1 class="up" style="--d:45.05s">Server compromised? <span class="grad">The ledger still tells.</span></h1>
+      <div class="zh up" style="--d:45.25s">A separate process watches treasury and hot wallet over Quicknode WSS — any outgoing tx without a guard record raises an alert</div>
+    </div>
+    <div class="radar pop" style="--d:45.2s">
+      <div class="rr" style="inset:60px"></div><div class="rr" style="inset:130px"></div><div class="rr" style="inset:200px"></div>
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(56,189,248,.25)"></div>
+      <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(56,189,248,.25)"></div>
+      <div class="sweep"></div>
+      <div class="blip pop" style="--d:45.7s;left:150px;top:140px"></div>
+      <div class="blip pop" style="--d:46.3s;left:340px;top:190px"></div>
+      <div class="blip pop" style="--d:46.9s;left:300px;top:360px"></div>
+      <div class="pop" style="--d:47.9s"><div class="blip red" style="left:140px;top:330px"></div><div class="pulse" style="left:140px;top:330px"></div></div>
+    </div>
+    <div class="abs up" style="--d:45.6s;left:180px;width:480px;top:850px;text-align:center;font-size:21px;color:var(--mut)">Quicknode WSS · live subscription<br>auto-reconnect · backfill via account_tx</div>
+    <div class="abs" style="left:800px;top:330px;width:1000px;height:300px">
+      <div class="tx right" style="--d:45.6s;top:0"><span class="ty">Payment</span><span class="ds">0.01 XRP → merchant A</span><span class="pill g">MATCHED</span></div>
+      <div class="tx right" style="--d:46.2s;top:76px"><span class="ty">EscrowCreate</span><span class="ds">6 XRP → merchant E</span><span class="pill g">MATCHED</span></div>
+      <div class="tx right" style="--d:46.8s;top:152px"><span class="ty">Top-up</span><span class="ds">treasury → hot wallet</span><span class="pill g">MATCHED</span></div>
+      <div class="right" style="--d:47.8s;position:absolute;left:0;top:228px"><div class="tx bad shake" style="--d:48.3s;position:relative"><span class="ty r">Payment</span><span class="ds">0.01 XRP → rNhnVKrn…t5w2AStw</span><span class="pill r">UNAUTHORIZED</span></div></div>
+    </div>
+    <div class="flash" style="--d:47.9s"></div>
+    <div class="shot up" style="--d:48.7s;left:800px;top:660px;width:1000px;height:156px"><img src="alert.png" style="width:1875px;max-width:none"></div>
+    <div class="shot fade" style="--d:50.5s;left:800px;top:660px;width:1000px;height:156px;box-shadow:0 0 60px rgba(251,146,60,.6)"><img src="contained.png" style="width:1875px;max-width:none"></div>
+    <svg class="cursor" width="40" height="48" viewBox="0 0 20 24"><path d="M2 1 L2 19 L7 14.5 L10.5 22 L13.5 20.6 L10 13.5 L16.5 13.5 Z" fill="#fff" stroke="#000" stroke-width="1.3"/></svg>
+    <div class="ripple"></div>
+    <div class="abs up" style="--d:50.8s;left:800px;width:1000px;top:860px;font-size:25px;line-height:1.5">
+      One click on <b class="r">Contain</b>: <b class="a">LOCKDOWN</b> pauses payments, hot wallet swept to treasury
+      <div style="font-size:34px;font-weight:800;margin-top:6px"><span id="swept" class="mono g">0.000000</span> <span class="g">XRP</span> <span style="font-size:22px;color:var(--mut);font-weight:500">returned · human-triggered, never automatic</span></div>
+    </div>
+  </section>
+
+  <!-- ================= S8 接入 52–57.6 ================= -->
+  <section class="scene" style="--s:52s;--e:57s">
+    <div class="head">
+      <div class="kicker up" style="--d:52.3s"><i>07</i>Integrate</div>
+      <h1 class="up" style="--d:52.45s">Three lines of Python — <span class="grad">or plug in over MCP</span></h1>
+      <div class="zh up" style="--d:52.65s">A Python SDK or an MCP server — any agent can pay safely through XGuard</div>
+    </div>
+    <div class="win left" style="--d:52.6s;left:120px;top:330px;width:960px;height:330px">
+      <div class="top"><i style="background:#f87171"></i><i style="background:#fbbf24"></i><i style="background:#34d399"></i><u>agent.py</u></div>
+      <pre id="typed" class="code" style="margin:0;padding:26px 30px;font-size:23px;white-space:pre"></pre>
+    </div>
+    <div class="abs" style="left:120px;top:690px;width:960px">
+      <div class="fade" style="--d:54.7s;font-size:21px;color:var(--mut);margin-bottom:14px" ><span class="mono">result["status"]</span> →</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <span class="pill g pop" style="--d:54.8s;font-size:21px">paid</span><span class="pill a pop" style="--d:54.95s;font-size:21px">pending_approval</span>
+        <span class="pill r pop" style="--d:55.1s;font-size:21px">denied</span><span class="pill r pop" style="--d:55.25s;font-size:21px">delivery_rejected</span>
+      </div>
+      <div class="up" style="--d:55.5s;margin-top:22px;font-size:23px">Same <span class="mono s">request_id</span> returns the existing result — <b>never pays twice</b></div>
+    </div>
+    <div class="win right" style="--d:53.0s;left:1140px;top:330px;width:660px;height:200px">
+      <div class="top"><i style="background:#f87171"></i><i style="background:#fbbf24"></i><i style="background:#34d399"></i><u>mcp.json</u></div>
+      <pre class="code" style="margin:0;padding:22px 26px;font-size:19px;line-height:1.55">{<span class="p">"mcpServers"</span>: {<span class="p">"agentguard"</span>: {
+  <span class="p">"command"</span>: <span class="str">"agentguard-mcp"</span>,
+  <span class="p">"args"</span>: [<span class="str">"--agent-id"</span>, <span class="str">"my-agent"</span>]}}}</pre>
+    </div>
+    <div class="tool pop" style="--d:53.6s;left:1140px;top:560px">fetch_paid_resource<small>pay for a resource, by policy</small></div>
+    <div class="tool pop" style="--d:53.75s;left:1510px;top:560px;width:290px">check_budget<small>remaining budget</small></div>
+    <div class="tool pop" style="--d:53.9s;left:1140px;top:670px">approval_status<small>check an approval</small></div>
+    <div class="tool pop" style="--d:54.05s;left:1510px;top:670px;width:290px">wait_for_approval<small>block until decided</small></div>
+    <div class="abs up" style="--d:54.4s;left:1140px;width:660px;top:800px;font-size:21px;color:var(--mut)">Claude Desktop · Strands Agents · Bedrock · any MCP client</div>
+  </section>
+
+  <!-- ================= S9 收尾 57–63 ================= -->
+  <section class="scene" style="--s:57s;--e:70s">
+    <div class="tiles" style="position:absolute;inset:0">
+      <div class="abs up" style="--d:57.3s;left:0;width:1920px;top:190px;text-align:center"><div class="kicker">No custom contracts</div>
+        <div style="font-size:52px;font-weight:760;margin-top:12px">Built entirely on <span class="grad">native XRPL</span></div></div>
+      <div class="tile card pop" style="--d:57.6s;left:180px;top:390px"><b>Payment + Memos</b><span>Audit memo on every payment</span></div>
+      <div class="tile card pop" style="--d:57.75s;left:710px;top:390px"><b>x402 on XRPL</b><span>exact scheme · presigned · InvoiceID</span></div>
+      <div class="tile card pop" style="--d:57.9s;left:1240px;top:390px"><b>Credentials · XLS-70</b><span>On-chain merchant allow-list</span></div>
+      <div class="tile card pop" style="--d:58.05s;left:180px;top:580px"><b>Escrow</b><span>PREIMAGE-SHA-256 conditional lock</span></div>
+      <div class="tile card pop" style="--d:58.2s;left:710px;top:580px"><b>SetRegularKey</b><span>Treasury signs only on Ledger</span></div>
+      <div class="tile card pop" style="--d:58.35s;left:1240px;top:580px"><b>LastLedgerSequence</b><span>Reconcile by hash, never resend</span></div>
+    </div>
+    <div class="ring" style="top:400px;animation-delay:60.2s"></div>
+    <div class="ring" style="top:400px;animation-delay:61s"></div>
+    <div class="abs blurin" style="--d:60.0s;left:870px;top:290px"><div id="talk2"><img class="logoBig" src="logo.png" style="width:180px;height:180px;border-radius:42px"></div></div>
+    <div class="abs blurin" style="--d:60.3s;left:0;width:1920px;top:500px;text-align:center"><span class="title" style="font-size:120px"><span class="grad" style="animation:none">X</span>Guard</span></div>
+    <div class="abs up" style="--d:60.8s;left:0;width:1920px;top:660px;text-align:center;font-size:48px;font-weight:750"><span class="grad">Let agents pay. Keep humans in control.</span></div>
+    <div class="abs up" style="--d:61.1s;left:0;width:1920px;top:735px;text-align:center;font-size:29px;color:var(--mut)">Policy-checked · human-approved · hardware-signed · audited on-chain</div>
+    <div class="abs fade" style="--d:61.4s;left:0;width:1920px;top:830px;text-align:center;font-size:22px;letter-spacing:.18em;color:#9fb4d3">XRPL TESTNET · x402 · LEDGER · QUICKNODE · MCP</div>
+  </section>
+
+  </div>
+
+  <!-- 角色：左 Alex（提问），右 XGuard 机器人（回答） -->
+  <div class="spot" id="spotA" style="left:-40px;background:#6366f1"></div>
+  <div class="spot" id="spotB" style="right:-40px;background:#0ea5e9"></div>
+  <div class="chrIn" style="--d:.2s;left:10px"><svg class="chr" viewBox="0 0 200 280">
+    <ellipse cx="100" cy="274" rx="70" ry="7" fill="rgba(0,0,0,.4)"/>
+    <g class="bobA">
+      <path d="M28 280 C28 205 58 182 100 182 C142 182 172 205 172 280 Z" fill="#6366f1"/>
+      <path d="M28 280 C28 232 40 210 58 196 L68 280 Z" fill="#4f46e5"/>
+      <path d="M82 184 Q100 214 118 184 Z" fill="#4338ca"/>
+      <line x1="92" y1="200" x2="90" y2="230" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/>
+      <line x1="108" y1="200" x2="110" y2="230" stroke="#e0e7ff" stroke-width="4" stroke-linecap="round"/>
+      <rect x="88" y="156" width="24" height="32" rx="10" fill="#e8b48c"/>
+      <g id="alexHead" style="transform-origin:100px 165px">
+        <circle cx="45" cy="114" r="11" fill="#f2bf98"/><circle cx="155" cy="114" r="11" fill="#f2bf98"/>
+        <circle cx="100" cy="108" r="56" fill="#f6c9a3"/>
+        <path d="M44 104 C40 58 72 40 104 42 C140 44 162 66 157 102 C148 82 128 70 100 72 C76 72 58 84 44 104 Z" fill="#2d1f17"/>
+        <path d="M74 58 C88 50 110 48 128 58" stroke="#4a3426" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path id="browL" d="M68 92 Q80 86 92 92" stroke="#2d1f17" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path id="browR" d="M108 92 Q120 86 132 92" stroke="#2d1f17" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <g class="blink"><ellipse cx="80" cy="108" rx="6" ry="8" fill="#1e1b4b"/><ellipse cx="120" cy="108" rx="6" ry="8" fill="#1e1b4b"/>
+          <circle cx="82" cy="105" r="2" fill="#fff"/><circle cx="122" cy="105" r="2" fill="#fff"/></g>
+        <circle cx="68" cy="127" r="8" fill="#fb7185" opacity=".35"/><circle cx="132" cy="127" r="8" fill="#fb7185" opacity=".35"/>
+        <path id="alexSmile" d="M88 134 Q100 144 112 134" stroke="#7c2d12" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <ellipse id="alexMouth" cx="100" cy="138" rx="10" ry="3" fill="#7c2d12" opacity="0"/>
+      </g>
+    </g>
+  </svg></div>
+  <div class="chrIn" style="--d:.35s;right:10px"><svg class="chr" viewBox="0 0 200 280">
+    <defs><linearGradient id="shieldG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient></defs>
+    <ellipse cx="100" cy="274" rx="70" ry="7" fill="rgba(0,0,0,.4)"/>
+    <g class="bobB">
+      <rect x="86" y="160" width="28" height="30" rx="8" fill="#cbd5e1"/>
+      <path d="M38 186 H162 V224 C162 250 134 264 100 276 C66 264 38 250 38 224 Z" fill="url(#shieldG)" stroke="#e0f2fe" stroke-width="5"/>
+      <path d="M76 204 Q100 232 124 204 M76 258 Q100 230 124 258" stroke="#fff" stroke-width="8" fill="none" stroke-linecap="round"/>
+      <g id="botHead" style="transform-origin:100px 170px">
+        <line x1="100" y1="28" x2="100" y2="52" stroke="#7dd3fc" stroke-width="6"/>
+        <circle id="botLight" cx="100" cy="20" r="10" fill="#38bdf8"/>
+        <rect x="22" y="84" width="22" height="46" rx="11" fill="#3b82f6"/><rect x="156" y="84" width="22" height="46" rx="11" fill="#3b82f6"/>
+        <rect x="36" y="50" width="128" height="118" rx="44" fill="#f8fafc" stroke="#e2e8f0" stroke-width="3"/>
+        <rect x="52" y="72" width="96" height="64" rx="26" fill="#0f172a"/>
+        <g class="blinkB"><path d="M68 106 Q78 93 88 106" stroke="#38bdf8" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <path d="M112 106 Q122 93 132 106" stroke="#38bdf8" stroke-width="7" fill="none" stroke-linecap="round"/></g>
+        <rect id="botMouth" x="86" y="118" width="28" height="4" rx="2" fill="#38bdf8"/>
+      </g>
+    </g>
+  </svg></div>
+  <div class="tag" style="left:10px"><b>Alex</b> · dev</div>
+  <div class="tag" style="right:10px"><b>XGuard</b> · guard</div>
+  <div class="bub" id="bub"><div class="who" id="bubWho"></div><div id="bubText"></div></div>
+
+  <div class="bar"></div>
+  <div class="black"></div>
+</div>
+
+<script src="timeline.js"></script>
+<script>
+// 确定性随机数，保证每次渲染一致
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const P = document.getElementById('particles');
+for (let i = 0; i < 70; i++) {
+  const d = document.createElement('div'); d.className = 'pt';
+  const s = 2 + rnd() * 4;
+  Object.assign(d.style, {left: rnd() * 1920 + 'px', top: 300 + rnd() * 900 + 'px', width: s + 'px', height: s + 'px',
+    animationDuration: 8 + rnd() * 10 + 's', animationDelay: -rnd() * 18 + 's', opacity: .8});
+  P.appendChild(d);
+}
+const C = document.getElementById('coins');
+for (let i = 0; i < 7; i++) {
+  const c = document.createElement('div'); c.className = 'coin'; c.textContent = '✕';
+  c.style.animationDelay = (8.8 + i * 0.19) + 's'; C.appendChild(c);
+}
+
+const tokens = [
+  ['k','from'],[' ',' agentguard '],['k','import'],[' ',' Guard\n\n'],
+  [' ','guard = Guard(policy_path='],['str','"policy.yaml"'],[' ',', agent_id='],['str','"research-agent"'],[' ',')\n'],
+  [' ','result = guard.'],['p','fetch_paid'],[' ','('],['str','"https://api.example.com/report"'],[' ',',\n    purpose='],
+  ['str','"weekly report data"'],[' ',', request_id='],['str','"report-42"'],[' ',')'],
+];
+const total = tokens.reduce((n, t) => n + t[1].length, 0);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (t, t0, t1) => clamp((t - t0) / (t1 - t0), 0, 1);
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+
+const el = id => document.getElementById(id);
+function render(t) {
+  // S2 报价被篡改 + 钱包被掏空
+  const amt = el('amt'), pay = el('payto');
+  if (t < 8.0) { amt.textContent = '8 XRP'; amt.className = ''; } else { amt.textContent = '80 XRP'; amt.className = 'r'; }
+  if (t < 8.35) { pay.textContent = 'rNfh4S…LCs6'; pay.className = ''; } else { pay.textContent = 'rPh1sh…x9Kq'; pay.className = 'r'; }
+  const b = 100 - 96.8 * easeOut(lerp(t, 8.9, 11.2));
+  el('bal').textContent = b.toFixed(2) + ' XRP';
+  el('bal').style.color = b < 50 ? '#fb7185' : '#e8eef8';
+  // S7 Contain 扫回金额
+  el('swept').textContent = (18.779335 * easeOut(lerp(t, 50.9, 51.7))).toFixed(6);
+  // S8 打字机
+  const n = Math.floor(total * lerp(t, 52.9, 54.6));
+  let left = n, html = '';
+  for (const [cls, txt] of tokens) {
+    if (left <= 0) break;
+    const part = esc(txt.slice(0, left)); left -= txt.length;
+    html += cls === ' ' ? part : `<span class="${cls}">${part}</span>`;
+  }
+  el('typed').innerHTML = html + '<span class="caret"></span>';
+}
+
+const DURATION = TL.dur;
+// 成片时间 → 动画时间：旁白把部分场景拉长，段内线性映射
+function toAnim(tv) {
+  const {anim, vstart, video} = TL;
+  let i = 0;
+  while (i < video.length - 1 && tv >= vstart[i + 1]) i++;
+  return anim[i] + (tv - vstart[i]) * (anim[i + 1] - anim[i]) / video[i];
+}
+const ease = x => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+const ampOf = (who, tv) => TL.amp[who][Math.min(TL.amp[who].length - 1, Math.round(tv * TL.fps))] || 0;
+function renderVoice(tv) {
+  const aA = ampOf('alex', tv), aB = ampOf('xguard', tv);
+  // Alex：张嘴 + 说话时点头
+  el('alexMouth').setAttribute('ry', 2 + aA * 11);
+  el('alexMouth').setAttribute('rx', 9 + aA * 3);
+  el('alexMouth').style.opacity = aA > 0.04 ? 1 : 0;
+  el('alexSmile').style.opacity = aA > 0.04 ? 0 : 1;
+  el('alexHead').style.transform = `rotate(${Math.sin(tv * 5) * 4 * Math.min(1, aA * 2)}deg)`;
+  el('browL').style.transform = el('browR').style.transform = `translateY(${-aA * 4}px)`;
+  // XGuard：面罩里的嘴巴条 + 天线灯
+  const h = 4 + aB * 16;
+  el('botMouth').setAttribute('height', h);
+  el('botMouth').setAttribute('y', 120 - h / 2);
+  el('botMouth').setAttribute('width', 28 + aB * 10);
+  el('botMouth').setAttribute('x', 86 - aB * 5);
+  el('botLight').style.filter = `drop-shadow(0 0 ${4 + aB * 16}px #38bdf8)`;
+  el('botHead').style.transform = `rotate(${Math.sin(tv * 4.2) * 3.5 * Math.min(1, aB * 2)}deg)`;
+  for (const id of ['talk1', 'talk2']) el(id).style.transform = `scale(${1 + aB * 0.045})`;
+  // 气泡：当前说话的人
+  let cue = null;
+  for (const c of TL.cues) if (tv >= c.s - 0.12 && tv < c.e + 0.45) cue = c;
+  el('spotA').style.opacity = cue && cue.who === 'alex' ? .35 : 0;
+  el('spotB').style.opacity = cue && cue.who === 'xguard' ? .35 : 0;
+  const bub = el('bub');
+  if (!cue) { bub.style.opacity = 0; return; }
+  const k0 = ease((tv - cue.s + 0.12) / 0.22), k1 = ease((cue.e + 0.45 - tv) / 0.18);
+  bub.className = 'bub ' + cue.who;
+  bub.style.opacity = Math.min(k0, k1);
+  bub.style.transform = `scale(${0.85 + 0.15 * Math.min(k0, k1)})`;
+  el('bubWho').textContent = cue.who === 'alex' ? 'Alex' : 'XGuard';
+  const words = cue.text.split(' ');
+  const n = Math.ceil(words.length * Math.min(1, Math.max(0, (tv - cue.s) / (cue.e - cue.s))));
+  el('bubText').innerHTML = words.map((w, j) => `<span class="w${j < n ? ' on' : ''}">${esc(w)}</span>`).join(' ');
+}
+window.seek = tv => {
+  const t = toAnim(tv);
+  for (const a of document.getAnimations()) { a.pause(); a.currentTime = t * 1000; }
+  render(t);
+  renderVoice(tv);
+};
+const params = new URLSearchParams(location.search);
+Promise.all([document.fonts.ready, ...[...document.images].map(i => i.decode().catch(() => {}))]).then(() => {
+  if (params.has('capture')) { window.seek(0); window.__ready = true; return; }
+  if (params.has('t')) { window.seek(+params.get('t')); window.__ready = true; return; }
+  // 预览：实时循环播放
+  const t0 = performance.now();
+  const loop = () => { window.seek(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); };
+  loop();
+});
+</script>
+</body>
+</html>

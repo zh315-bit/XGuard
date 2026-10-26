@@ -5,6 +5,9 @@ first fetches the quote and decides, according to policy, **AUTO** (paid automat
 **HOLD** (human approval + Ledger signature) / **DENY** (refused). Every decision is recorded in an audit log, and every
 transaction the guard signs carries an on-chain Memo. The agent never gets access to private keys.
 
+**Demo video** (about 100 s): [video/XGuard_intro.mp4](video/XGuard_intro.mp4). It is rendered from `video/index.html`;
+the voices are generated with ElevenLabs by `video/build.py`.
+
 ## Screenshots
 
 The console, captured during a "weekly report" mission: data source A was paid automatically,

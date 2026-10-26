@@ -1,0 +1,3 @@
+numpy
+elevenlabs
+python-dotenv
